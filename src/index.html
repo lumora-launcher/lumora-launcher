@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="aurora" data-layout="modern">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; img-src 'self' https://mc-heads.net data:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>Lumora Launcher</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ============ AÇILIŞ ANİMASYONU (SPLASH SCREEN) ============ -->
+  <div class="splash" id="splash">
+    <div class="splash-glow"></div>
+    <div class="splash-particles">
+      <span></span><span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <div class="splash-center">
+      <div class="splash-cube-wrap">
+        <div class="splash-ring r1"></div>
+        <div class="splash-ring r2"></div>
+        <div class="splash-logo">
+          <svg viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 2.3 6.7 3.7L12 11.7 5.3 8 12 4.3ZM5 9.7l6 3.3v6.7l-6-3.3V9.7Zm8 10V13l6-3.3v6.7l-6 3.3Z"/></svg>
+        </div>
+      </div>
+      <h1 class="splash-title">LUMORA</h1>
+      <p class="splash-sub" id="splashStatus">Sistem hazırlanıyor...</p>
+      <div class="splash-bar">
+        <div class="splash-bar-fill" id="splashFill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arka plan efektleri -->
+  <div class="bg">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+    <div class="particles">
+      <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    </div>
+    <div class="grid"></div>
+  </div>
+
+  <!-- Başlık çubuğu -->
+  <header class="titlebar">
+    <div class="brand">
+      <div class="logo">
+        <svg viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 2.3 6.7 3.7L12 11.7 5.3 8 12 4.3ZM5 9.7l6 3.3v6.7l-6-3.3V9.7Zm8 10V13l6-3.3v6.7l-6 3.3Z"/></svg>
+      </div>
+      <span class="brand-name">Lumora</span>
+      <span class="version-pill" id="appVersionBadge" title="Güncellemeleri kontrol et">v1.0.0</span>
+    </div>
+
+    <div class="titlebar-quick">
+      <div class="theme-dots" title="Hızlı Tema Değiştir">
+        <button class="theme-dot" data-quick-theme="aurora" title="Aurora (Mor & Turkuaz)" style="--dot1:#7c5cff;--dot2:#20d6a8"></button>
+        <button class="theme-dot" data-quick-theme="emerald" title="Zümrüt (Creeper Yeşili)" style="--dot1:#10b981;--dot2:#84cc16"></button>
+        <button class="theme-dot" data-quick-theme="nether" title="Nether (Kızıl & Ateş)" style="--dot1:#ff4d4d;--dot2:#ff9f1c"></button>
+        <button class="theme-dot" data-quick-theme="cyber" title="Cyberpunk (Neon Pembe & Mavi)" style="--dot1:#ff2a85;--dot2:#00f0ff"></button>
+        <button class="theme-dot" data-quick-theme="frost" title="Buzul (Safir & Gökyüzü)" style="--dot1:#38bdf8;--dot2:#818cf8"></button>
+      </div>
+    </div>
+
+    <div class="win-controls">
+      <button id="btnMin" title="Küçült"><svg viewBox="0 0 12 12"><rect x="2" y="5.5" width="8" height="1"/></svg></button>
+      <button id="btnMax" title="Büyüt"><svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" fill="none" stroke="currentColor"/></svg></button>
+      <button id="btnClose" class="close" title="Kapat"><svg viewBox="0 0 12 12"><path d="M2.5 2.5l7 7m0-7l-7 7" stroke="currentColor" stroke-width="1.2"/></svg></button>
+    </div>
+  </header>
+
+  <!-- Güncelleme Bildirim Çubuğu (Yeni sürüm varsa görünür) -->
+  <div class="update-banner" id="updateBanner">
+    <div class="update-banner-left">
+      <span class="pulse-dot"></span>
+      <span id="updateBannerText">Yeni Lumora sürümü mevcut!</span>
+    </div>
+    <div class="update-banner-actions">
+      <button class="banner-btn primary" id="btnBannerUpdate">Şimdi Güncelle</button>
+      <button class="banner-btn" id="btnBannerDismiss">Daha Sonra</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- Kenar çubuğu -->
+    <nav class="sidebar">
+      <button class="nav-btn active" data-page="home" title="Oyna">
+        <svg viewBox="0 0 24 24"><path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14Z"/></svg>
+        <span>Oyna</span>
+      </button>
+      <button class="nav-btn" data-page="appearance" title="Görünüm & Arayüz">
+        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20 2.5 2.5 0 0 0 2.5-2.5c0-.6-.2-1.2-.6-1.6-.4-.4-.6-.9-.6-1.4a2.5 2.5 0 0 1 2.5-2.5H17a5 5 0 0 0 5-5c0-4.9-4.5-9-10-9Zm-5.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"/></svg>
+        <span>Görünüm</span>
+      </button>
+      <button class="nav-btn" data-page="settings" title="Ayarlar">
+        <svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3h-4l-.4 2.9a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1L11 21h4l.4-2.9a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5L19.4 13ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" transform="translate(-1 0)"/></svg>
+        <span>Ayarlar</span>
+      </button>
+      <button class="nav-btn" data-page="updates" title="Güncellemeler">
+        <span class="nav-badge" id="navUpdateDot"></span>
+        <svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.3 0 6 2.7 6 6 0 1-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8Zm0 14c-3.3 0-6-2.7-6-6 0-1 .25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3Z"/></svg>
+        <span>Güncelle</span>
+      </button>
+      <button class="nav-btn" data-page="console" title="Konsol">
+        <svg viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 2v12h16V6H4Zm2.3 2.3L10 12l-3.7 3.7-1.4-1.4L7.2 12 4.9 9.7l1.4-1.4ZM11 15h6v2h-6v-2Z"/></svg>
+        <span>Konsol</span>
+      </button>
+      <div class="spacer"></div>
+      <button class="nav-btn" id="btnFolder" title="Oyun klasörü">
+        <svg viewBox="0 0 24 24"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2Z"/></svg>
+        <span>Klasör</span>
+      </button>
+    </nav>
+
+    <main class="content">
+      <!-- ============ ANA SAYFA ============ -->
+      <section class="page active" id="page-home">
+        <div class="hero stagger-1">
+          <div class="hero-text">
+            <div class="status-pill"><span class="online-dot"></span> Mojang Sunucuları Aktif</div>
+            <p class="eyebrow" id="greeting">Tekrar hoş geldin</p>
+            <h1>Maceraya <span class="gradient-text">hazır mısın?</span></h1>
+            <p class="sub">Kullanıcı adını yaz, sürümünü seç ve tek tıkla oyuna gir.</p>
+          </div>
+          <div class="avatar-wrap" id="avatarCard" title="Skin Önizleme">
+            <img id="avatar" src="https://mc-heads.net/avatar/Steve/128" alt="avatar" />
+            <div class="avatar-ring"></div>
+            <span class="avatar-tag" id="avatarTag">Steve</span>
+          </div>
+        </div>
+
+        <div class="play-card glass stagger-2">
+          <div class="field">
+            <label for="username">Kullanıcı adı</label>
+            <div class="input-icon">
+              <svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5.3 0-8 2.7-8 5v1h16v-1c0-2.3-2.7-5-8-5Z"/></svg>
+              <input id="username" maxlength="16" placeholder="Steve" spellcheck="false" autocomplete="off" />
+            </div>
+            <small class="hint" id="usernameHint">3-16 karakter, harf, rakam ve _</small>
+          </div>
+
+          <div class="field">
+            <label for="version">Sürüm</label>
+            <div class="select-wrap">
+              <select id="version"><option>Yükleniyor...</option></select>
+            </div>
+            <small class="hint" id="javaHint">&nbsp;</small>
+          </div>
+
+          <button id="playBtn" class="play-btn">
+            <span class="play-shimmer"></span>
+            <span class="play-label">OYNA</span>
+            <svg viewBox="0 0 24 24"><path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14Z"/></svg>
+          </button>
+        </div>
+
+        <div class="progress-wrap" id="progressWrap">
+          <div class="progress-info">
+            <span id="progressText">Hazırlanıyor...</span>
+            <span id="progressPct">0%</span>
+          </div>
+          <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+        </div>
+
+        <div class="quick-stats stagger-3">
+          <div class="stat glass" data-goto="settings">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4V6Zm2 2v8h12V8H6Zm2 2h2v4H8v-4Zm3 0h2v4h-2v-4Zm3 0h2v4h-2v-4Z"/></svg></div>
+            <div><span class="stat-label">RAM</span><span class="stat-value" id="statRam">4 GB</span></div>
+          </div>
+          <div class="stat glass" data-goto="settings">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M18 8h1a3 3 0 0 1 0 6h-1v1a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8h14Zm0 2v2h1a1 1 0 0 0 0-2h-1ZM6 20h12v2H6v-2Z"/></svg></div>
+            <div><span class="stat-label">Java</span><span class="stat-value" id="statJava">Otomatik</span></div>
+          </div>
+          <div class="stat glass" data-goto="settings">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M3 4h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-7v2h3v2H7v-2h3v-2H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm1 2v10h16V6H4Z"/></svg></div>
+            <div><span class="stat-label">Ekran</span><span class="stat-value" id="statScreen">Pencere</span></div>
+          </div>
+          <div class="stat glass" data-goto="appearance">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-.5-.4-1-1-1h-2a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h1a9 9 0 0 0-7-2Z"/></svg></div>
+            <div><span class="stat-label">Tema</span><span class="stat-value" id="statTheme">Aurora</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ GÖRÜNÜM & TASARIMLAR ============ -->
+      <section class="page" id="page-appearance">
+        <h2 class="page-title">Görünüm ve Arayüz Tasarımı</h2>
+
+        <div class="settings-grid">
+          <!-- Renk Temaları -->
+          <div class="card glass wide stagger-1">
+            <div class="card-head">
+              <div>
+                <h3>Renk Temaları</h3>
+                <small class="hint">Launcher'ın atmosferini ve ışıklandırmasını anında değiştir</small>
+              </div>
+              <span class="badge" id="activeThemeBadge">Aurora</span>
+            </div>
+            <div class="theme-grid" id="themeGrid">
+              <button class="theme-card active" data-theme="aurora">
+                <div class="theme-preview" style="background:linear-gradient(135deg,#0b0d14 30%,#7c5cff 80%,#20d6a8)"></div>
+                <div class="theme-info">
+                  <strong>Aurora</strong>
+                  <span>Mor & Turkuaz Kuzey Işıkları</span>
+                </div>
+              </button>
+              <button class="theme-card" data-theme="emerald">
+                <div class="theme-preview" style="background:linear-gradient(135deg,#07120e 30%,#10b981 80%,#84cc16)"></div>
+                <div class="theme-info">
+                  <strong>Zümrüt</strong>
+                  <span>Minecraft Yeşili & Orman</span>
+                </div>
+              </button>
+              <button class="theme-card" data-theme="nether">
+                <div class="theme-preview" style="background:linear-gradient(135deg,#14080a 30%,#ff4d4d 80%,#ff9f1c)"></div>
+                <div class="theme-info">
+                  <strong>Nether</strong>
+                  <span>Lav Kızılı & Magma Turuncusu</span>
+                </div>
+              </button>
+              <button class="theme-card" data-theme="cyber">
+                <div class="theme-preview" style="background:linear-gradient(135deg,#090614 30%,#ff2a85 80%,#00f0ff)"></div>
+                <div class="theme-info">
+                  <strong>Cyberpunk</strong>
+                  <span>Neon Pembe & Elektrik Mavisi</span>
+                </div>
+              </button>
+              <button class="theme-card" data-theme="frost">
+                <div class="theme-preview" style="background:linear-gradient(135deg,#071018 30%,#38bdf8 80%,#818cf8)"></div>
+                <div class="theme-info">
+                  <strong>Buzul</strong>
+                  <span>Soğuk Safir & Kutup Mavisi</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Arayüz Yerleşim Düzeni -->
+          <div class="card glass wide stagger-2">
+            <div class="card-head">
+              <div>
+                <h3>Arayüz Düzeni (Layout)</h3>
+                <small class="hint">Ana sayfanın ve menülerin yerleşim tarzını seç</small>
+              </div>
+              <span class="badge" id="activeLayoutBadge">Modern</span>
+            </div>
+            <div class="layout-grid" id="layoutGrid">
+              <button class="layout-card active" data-layout="modern">
+                <div class="layout-sketch sketch-modern">
+                  <div class="sk-side"></div>
+                  <div class="sk-body">
+                    <div class="sk-hero"></div>
+                    <div class="sk-bar"></div>
+                  </div>
+                </div>
+                <strong>Modern Kartlar</strong>
+                <span>Sol menü, geniş karşılama alanı ve bilgi kartları</span>
+              </button>
+
+              <button class="layout-card" data-layout="compact">
+                <div class="layout-sketch sketch-compact">
+                  <div class="sk-body">
+                    <div class="sk-center-box"></div>
+                    <div class="sk-dock"></div>
+                  </div>
+                </div>
+                <strong>Sinematik Alt Bar</strong>
+                <span>Tam ekran odaklı, alt kontrol barlı esports tarzı</span>
+              </button>
+
+              <button class="layout-card" data-layout="minimal">
+                <div class="layout-sketch sketch-minimal">
+                  <div class="sk-side"></div>
+                  <div class="sk-body">
+                    <div class="sk-focus"></div>
+                  </div>
+                </div>
+                <strong>Minimalist Odak</strong>
+                <span>Ortalanmış tek kart, sade ve dikkat dağıtmayan görünüm</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Animasyon Ayarları -->
+          <div class="card glass stagger-3">
+            <div class="card-head"><h3>Animasyonlar</h3></div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-title">Arayüz ve arka plan animasyonları</div>
+                <small class="hint">Yüzen ışıklar, parçacıklar ve geçiş efektleri</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="animationsEnabled" checked /><span></span></label>
+            </div>
+          </div>
+
+          <div class="card glass stagger-3">
+            <div class="card-head">
+              <h3>Açılış Animasyonu</h3>
+              <button class="ghost-btn" id="btnReplaySplash">Şimdi Önizle</button>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-title">Başlangıçta Lumora introsunu göster</div>
+                <small class="hint">Launcher açılırken sinematik logo animasyonu oynatılır</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="splashEnabled" checked /><span></span></label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ AYARLAR ============ -->
+      <section class="page" id="page-settings">
+        <h2 class="page-title">Oyun & Sistem Ayarları</h2>
+        <div class="settings-grid">
+
+          <div class="card glass stagger-1">
+            <div class="card-head">
+              <h3>Bellek (RAM)</h3>
+              <span class="badge" id="ramValue">4.0 GB</span>
+            </div>
+            <input type="range" id="ramSlider" min="1024" max="16384" step="512" />
+            <div class="range-labels"><span>1 GB</span><span id="ramMaxLabel">16 GB</span></div>
+            <small class="hint" id="ramHint">Sistem RAM'inin yarısından fazlasını vermemeni öneririz.</small>
+            <div class="chips" id="ramPresets">
+              <button class="chip" data-ram="2048">2 GB</button>
+              <button class="chip" data-ram="4096">4 GB</button>
+              <button class="chip" data-ram="6144">6 GB</button>
+              <button class="chip" data-ram="8192">8 GB</button>
+            </div>
+          </div>
+
+          <div class="card glass stagger-1">
+            <div class="card-head">
+              <h3>Java</h3>
+              <button class="ghost-btn" id="btnScanJava">Yeniden tara</button>
+            </div>
+            <div class="select-wrap">
+              <select id="javaSelect"></select>
+            </div>
+            <button class="ghost-btn full" id="btnPickJava">Gözat... (javaw.exe seç)</button>
+            <small class="hint" id="javaSettingHint">Otomatik modda, seçtiğin sürümün istediği Java bilgisayarda yoksa launcher resmi Java'yı kendisi indirir.</small>
+          </div>
+
+          <div class="card glass stagger-2">
+            <div class="card-head"><h3>Ekran</h3></div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-title">Tam ekran</div>
+                <small class="hint">Oyun tam ekran açılır</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="fullscreen" /><span></span></label>
+            </div>
+            <div class="res-row" id="resRow">
+              <div class="field">
+                <label>Genişlik</label>
+                <input type="number" id="width" min="640" />
+              </div>
+              <span class="x">×</span>
+              <div class="field">
+                <label>Yükseklik</label>
+                <input type="number" id="height" min="480" />
+              </div>
+            </div>
+          </div>
+
+          <div class="card glass stagger-2">
+            <div class="card-head"><h3>Launcher</h3></div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-title">Oyun açılınca gizle</div>
+                <small class="hint">Oyun kapanınca launcher geri gelir</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="closeOnLaunch" /><span></span></label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-title">Snapshot sürümleri</div>
+                <small class="hint">Deneysel sürümleri listede göster</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="showSnapshots" /><span></span></label>
+            </div>
+          </div>
+
+          <div class="card glass wide stagger-3">
+            <div class="card-head"><h3>Gelişmiş</h3></div>
+            <div class="field">
+              <label>Oyun klasörü</label>
+              <div class="inline">
+                <input id="gameDir" spellcheck="false" />
+                <button class="ghost-btn" id="btnPickDir">Değiştir</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>Ek JVM argümanları</label>
+              <input id="jvmArgs" placeholder="-XX:+UseG1GC -XX:+UnlockExperimentalVMOptions" spellcheck="false" />
+            </div>
+          </div>
+        </div>
+        <div class="save-bar">
+          <span class="saved" id="savedMsg">✓ Kaydedildi</span>
+        </div>
+      </section>
+
+      <!-- ============ GÜNCELLEMELER ============ -->
+      <section class="page" id="page-updates">
+        <h2 class="page-title">Güncellemeler & Açık Kaynak</h2>
+
+        <div class="settings-grid">
+          <div class="card glass wide stagger-1">
+            <div class="update-hero">
+              <div class="update-hero-left">
+                <div class="update-icon-box" id="updateStatusIcon">
+                  <svg viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Zm-1 13-4-4 1.4-1.4 2.6 2.6 5.6-5.6L18 8l-7 7Z"/></svg>
+                </div>
+                <div>
+                  <div class="update-ver-line">
+                    <h3>Lumora Launcher</h3>
+                    <span class="badge" id="currentVerText">v1.0.0</span>
+                    <span class="verified-pill">✓ Resmi Sürüm</span>
+                  </div>
+                  <p class="sub-sm" id="updateStatusTitle">Güncellemeler resmi GitHub sunucusu üzerinden otomatik denetlenir.</p>
+                </div>
+              </div>
+
+              <div class="update-actions">
+                <button class="play-btn sm-btn" id="btnCheckUpdate">
+                  <span class="play-label">GÜNCELLEMELERİ DENETLE</span>
+                </button>
+                <button class="ghost-btn hidden" id="btnDownloadUpdate">İndir ve Kur</button>
+                <button class="ghost-btn hidden" id="btnInstallUpdate">Yeniden Başlat & Kur</button>
+              </div>
+            </div>
+
+            <div class="update-progress-wrap hidden" id="updateProgressWrap">
+              <div class="progress-info">
+                <span id="updateProgressText">Güncelleme indiriliyor...</span>
+                <span id="updateProgressPct">0%</span>
+              </div>
+              <div class="progress"><div class="progress-bar" id="updateProgressBar"></div></div>
+            </div>
+
+            <div class="release-notes hidden" id="releaseNotesBox">
+              <div class="release-notes-head">
+                <strong id="releaseNotesTitle">Yeni Sürüm Notları</strong>
+                <button class="ghost-btn" id="btnOpenReleasePage">GitHub'da İncele</button>
+              </div>
+              <pre id="releaseNotesBody"></pre>
+            </div>
+          </div>
+
+          <div class="card glass stagger-2">
+            <div class="card-head">
+              <h3>Resmi Açık Kaynak Deposu</h3>
+              <span class="badge">MIT Lisansı</span>
+            </div>
+            <p class="sub-sm">Lumora tamamen açık kaynaklıdır ve şeffaftır. Tüm kaynak kodlarını ve yayınlanan sürümleri resmi GitHub sayfasından inceleyebilirsin.</p>
+            <div class="repo-link-box" id="btnOpenGithubRepo" title="GitHub'da Aç">
+              <div class="repo-link-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z"/></svg>
+              </div>
+              <div class="repo-link-info">
+                <strong>lumora-launcher / lumora-launcher</strong>
+                <span>https://github.com/lumora-launcher/lumora-launcher</span>
+              </div>
+              <span class="repo-ext">↗</span>
+            </div>
+          </div>
+
+          <div class="card glass stagger-2">
+            <div class="card-head"><h3>Güvenlik & Otomatik Güncelleme</h3></div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-title">Açılışta güncellemeleri otomatik kontrol et</div>
+                <small class="hint">Yeni bir sürüm yayınlandığında üstte bildirim çubuğu gösterilir</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="autoUpdateCheck" checked /><span></span></label>
+            </div>
+            <div class="security-note">
+              <svg viewBox="0 0 24 24"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4Zm-2 16-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8Z"/></svg>
+              <span>Güncelleme sunucusu güvenliğiniz için resmi GitHub deposuna kilitlenmiştir ve dışarıdan değiştirilemez.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ KONSOL ============ -->
+      <section class="page" id="page-console">
+        <div class="console-head">
+          <h2 class="page-title">Konsol</h2>
+          <button class="ghost-btn" id="btnClearLog">Temizle</button>
+        </div>
+        <pre class="console glass" id="console"></pre>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+{
+  "name": "lumora-launcher",
+  "productName": "Lumora Launcher",
+  "version": "1.0.0",
+  "description": "Modern, açık kaynaklı kişisel Minecraft Launcher",
+  "homepage": "https://github.com/lumora-launcher/lumora-launcher",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lumora-launcher/lumora-launcher.git"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "publish": "electron-builder --win --publish always"
+  },
+  "author": "Doruk",
+  "license": "MIT",
+  "build": {
+    "appId": "com.lumora.launcher",
+    "productName": "Lumora Launcher",
+    "icon": "assets/icon.ico",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "lumora-launcher",
+        "repo": "lumora-launcher",
+        "releaseType": "release"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Lumora Launcher"
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9",
+    "minecraft-launcher-core": "^3.18.2"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.12"
+  }
+}
