@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; img-src 'self' https://mc-heads.net data:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+    content="default-src 'self'; img-src 'self' https://mc-heads.net https://cdn.modrinth.com https://*.modrinth.com data:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
   <title>Lumora Launcher</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -68,7 +68,7 @@
     </div>
   </header>
 
-  <!-- Güncelleme Bildirim Çubuğu (Yeni sürüm varsa görünür) -->
+  <!-- Güncelleme Bildirim Çubuğu -->
   <div class="update-banner" id="updateBanner">
     <div class="update-banner-left">
       <span class="pulse-dot"></span>
@@ -86,6 +86,14 @@
       <button class="nav-btn active" data-page="home" title="Oyna">
         <svg viewBox="0 0 24 24"><path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14Z"/></svg>
         <span>Oyna</span>
+      </button>
+      <button class="nav-btn" data-page="instances" title="İzole Profiller (Instances)">
+        <svg viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5Zm0 13-10-5v2l10 5 10-5v-2l-10 5Zm0 4-10-5v2l10 5 10-5v-2l-10 5Z"/></svg>
+        <span>Profiller</span>
+      </button>
+      <button class="nav-btn" data-page="modrinth" title="Modrinth Mağazası (Mod, Shader, Kaynak Paketi)">
+        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 14.93V14h-2v2.93A8 8 0 0 1 4.07 11H7V9H4.07A8 8 0 0 1 11 4.07V7h2V4.07A8 8 0 0 1 19.93 11H17v2h2.93A8 8 0 0 1 13 16.93Z"/></svg>
+        <span>Modrinth</span>
       </button>
       <button class="nav-btn" data-page="appearance" title="Görünüm & Arayüz">
         <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20 2.5 2.5 0 0 0 2.5-2.5c0-.6-.2-1.2-.6-1.6-.4-.4-.6-.9-.6-1.4a2.5 2.5 0 0 1 2.5-2.5H17a5 5 0 0 0 5-5c0-4.9-4.5-9-10-9Zm-5.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"/></svg>
@@ -105,7 +113,7 @@
         <span>Konsol</span>
       </button>
       <div class="spacer"></div>
-      <button class="nav-btn" id="btnFolder" title="Oyun klasörü">
+      <button class="nav-btn" id="btnFolder" title="Aktif profil klasörünü aç">
         <svg viewBox="0 0 24 24"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2Z"/></svg>
         <span>Klasör</span>
       </button>
@@ -116,10 +124,13 @@
       <section class="page active" id="page-home">
         <div class="hero stagger-1">
           <div class="hero-text">
-            <div class="status-pill"><span class="online-dot"></span> Mojang Sunucuları Aktif</div>
+            <div class="status-pill" id="netStatusPill">
+              <span class="online-dot" id="netStatusDot"></span>
+              <span id="netStatusText">Mojang API kontrol ediliyor...</span>
+            </div>
             <p class="eyebrow" id="greeting">Tekrar hoş geldin</p>
             <h1>Maceraya <span class="gradient-text">hazır mısın?</span></h1>
-            <p class="sub">Kullanıcı adını yaz, sürümünü seç ve tek tıkla oyuna gir.</p>
+            <p class="sub">İzole profilini seç, Modrinth'ten modlarını ekle ve tek tıkla oyuna gir.</p>
           </div>
           <div class="avatar-wrap" id="avatarCard" title="Skin Önizleme">
             <img id="avatar" src="https://mc-heads.net/avatar/Steve/128" alt="avatar" />
@@ -139,9 +150,12 @@
           </div>
 
           <div class="field">
-            <label for="version">Sürüm</label>
+            <div class="field-label-row">
+              <label for="homeInstanceSelect">Aktif Profil (Instance)</label>
+              <button class="link-btn" id="btnManageInstances">Profilleri Yönet →</button>
+            </div>
             <div class="select-wrap">
-              <select id="version"><option>Yükleniyor...</option></select>
+              <select id="homeInstanceSelect"></select>
             </div>
             <small class="hint" id="javaHint">&nbsp;</small>
           </div>
@@ -162,17 +176,17 @@
         </div>
 
         <div class="quick-stats stagger-3">
+          <div class="stat glass" data-goto="instances">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5Zm0 13-10-5v2l10 5 10-5v-2l-10 5Zm0 4-10-5v2l10 5 10-5v-2l-10 5Z"/></svg></div>
+            <div><span class="stat-label">Yükleyici</span><span class="stat-value" id="statLoader">Vanilla</span></div>
+          </div>
+          <div class="stat glass" data-goto="modrinth">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 14.93V14h-2v2.93A8 8 0 0 1 4.07 11H7V9H4.07A8 8 0 0 1 11 4.07V7h2V4.07A8 8 0 0 1 19.93 11H17v2h2.93A8 8 0 0 1 13 16.93Z"/></svg></div>
+            <div><span class="stat-label">Kurulu İçerik</span><span class="stat-value" id="statMods">0 Mod</span></div>
+          </div>
           <div class="stat glass" data-goto="settings">
             <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4V6Zm2 2v8h12V8H6Zm2 2h2v4H8v-4Zm3 0h2v4h-2v-4Zm3 0h2v4h-2v-4Z"/></svg></div>
-            <div><span class="stat-label">RAM</span><span class="stat-value" id="statRam">4 GB</span></div>
-          </div>
-          <div class="stat glass" data-goto="settings">
-            <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M18 8h1a3 3 0 0 1 0 6h-1v1a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8h14Zm0 2v2h1a1 1 0 0 0 0-2h-1ZM6 20h12v2H6v-2Z"/></svg></div>
-            <div><span class="stat-label">Java</span><span class="stat-value" id="statJava">Otomatik</span></div>
-          </div>
-          <div class="stat glass" data-goto="settings">
-            <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M3 4h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-7v2h3v2H7v-2h3v-2H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm1 2v10h16V6H4Z"/></svg></div>
-            <div><span class="stat-label">Ekran</span><span class="stat-value" id="statScreen">Pencere</span></div>
+            <div><span class="stat-label">RAM & Java</span><span class="stat-value" id="statRam">4 GB</span></div>
           </div>
           <div class="stat glass" data-goto="appearance">
             <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-.5-.4-1-1-1h-2a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h1a9 9 0 0 0-7-2Z"/></svg></div>
@@ -181,12 +195,155 @@
         </div>
       </section>
 
+      <!-- ============ İZOLE PROFİLLER (INSTANCES) ============ -->
+      <section class="page" id="page-instances">
+        <div class="page-head-row">
+          <div>
+            <h2 class="page-title">İzole Profiller (Instances)</h2>
+            <p class="sub-sm">Her profil kendi bağımsız <code>mods</code>, <code>saves</code>, <code>shaderpacks</code> ve <code>config</code> klasörüne sahiptir.</p>
+          </div>
+          <button class="play-btn sm-btn" id="btnShowCreateInstance">
+            <span class="play-label">+ YENİ PROFİL OLUŞTUR</span>
+          </button>
+        </div>
+
+        <!-- Yeni Profil Oluşturma Kartı -->
+        <div class="card glass create-inst-card hidden" id="createInstanceBox">
+          <div class="card-head">
+            <h3>Yeni İzole Profil Oluştur</h3>
+            <button class="ghost-btn" id="btnCancelCreateInstance">İptal</button>
+          </div>
+          <div class="create-inst-grid">
+            <div class="field">
+              <label>Profil Adı</label>
+              <input id="newInstName" placeholder="Örn: Survival Modpaketim 1.21.4" maxlength="40" />
+            </div>
+            <div class="field">
+              <label>Minecraft Sürümü</label>
+              <div class="select-wrap">
+                <select id="newInstVersion"></select>
+              </div>
+            </div>
+            <div class="field">
+              <label>Mod Yükleyici / İstemci (Loader)</label>
+              <div class="loader-pills" id="newInstLoaderGroup">
+                <button type="button" class="loader-pill active" data-loader="fabric">Fabric</button>
+                <button type="button" class="loader-pill" data-loader="optifine">OptiFine</button>
+                <button type="button" class="loader-pill" data-loader="forge">Forge</button>
+                <button type="button" class="loader-pill" data-loader="quilt">Quilt</button>
+                <button type="button" class="loader-pill" data-loader="vanilla">Vanilla</button>
+              </div>
+            </div>
+          </div>
+          <div class="create-inst-actions">
+            <button class="play-btn sm-btn" id="btnConfirmCreateInstance">
+              <span class="play-label">PROFİLİ OLUŞTUR</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Profil Kartları Listesi -->
+        <div class="instance-grid stagger-1" id="instanceGrid"></div>
+
+        <!-- Seçili Profilin Kurulu İçeriği (Mod / Shader / ResourcePack) -->
+        <div class="card glass wide stagger-2" id="instanceDetailCard">
+          <div class="inst-detail-head">
+            <div>
+              <div class="inst-detail-title-row">
+                <h3 id="detailInstName">Profil İçeriği</h3>
+                <span class="badge" id="detailInstBadge">Fabric 1.21.4</span>
+                <span class="badge" id="detailBaseStatusBadge">Ana Sürüm Denetleniyor...</span>
+              </div>
+              <small class="hint" id="detailInstPath"></small>
+            </div>
+            <div class="inst-detail-actions">
+              <button class="ghost-btn hidden" id="btnPrepareBaseVersion" title="Bu profilin ihtiyaç duyduğu ana Minecraft sürümünü şimdi indir">⬇ Ana Sürümü Şimdi İndir</button>
+              <button class="ghost-btn accent-border" id="btnInstallFpsPack" title="Sodium, Lithium, FerriteCore, EntityCulling kur">⚡ Tek Tıkla FPS Paketi Kur</button>
+              <button class="ghost-btn" id="btnCheckModUpdates" title="Kurulu modları Modrinth üzerinden güncelle">🔄 Mod Güncellemelerini Denetle</button>
+              <button class="ghost-btn" id="btnOpenInstModrinth">+ Modrinth'ten Ekle</button>
+              <button class="ghost-btn" id="btnOpenInstFolder">Klasörü Aç</button>
+            </div>
+          </div>
+
+          <div class="sub-tabs" id="instContentTabs">
+            <button class="sub-tab active" data-ctype="mod">Modlar</button>
+            <button class="sub-tab" data-ctype="shader">Shader Paketleri</button>
+            <button class="sub-tab" data-ctype="resourcepack">Kaynak Paketleri (Resource Packs)</button>
+          </div>
+
+          <div class="installed-list" id="installedContentList"></div>
+        </div>
+      </section>
+
+      <!-- ============ MODRINTH MAĞAZASI ============ -->
+      <section class="page" id="page-modrinth">
+        <div class="page-head-row">
+          <div>
+            <h2 class="page-title">Modrinth İçerik Mağazası</h2>
+            <p class="sub-sm">Tarayıcıya gerek kalmadan doğrudan aktif profiline mod, shader veya kaynak paketi indir.</p>
+          </div>
+          <div class="modrinth-target-box glass">
+            <span class="stat-label">Hedef Profil:</span>
+            <div class="select-wrap compact-select">
+              <select id="modrinthInstanceSelect"></select>
+            </div>
+          </div>
+        </div>
+
+        <div class="modrinth-toolbar glass stagger-1">
+          <div class="sub-tabs" id="modrinthTypeTabs">
+            <button class="sub-tab active" data-mtype="mod">🧩 Modlar</button>
+            <button class="sub-tab" data-mtype="shader">✨ Shader</button>
+            <button class="sub-tab" data-mtype="resourcepack">🎨 Kaynak Paketi</button>
+          </div>
+
+          <div class="modrinth-search-row">
+            <div class="input-icon flex-1">
+              <svg viewBox="0 0 24 24"><path d="M10 2a8 8 0 1 0 4.9 14.32l4.39 4.39 1.41-1.41-4.39-4.39A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12Z"/></svg>
+              <input id="modrinthSearchInput" placeholder="Mod, shader veya kaynak paketi ara (örn: Sodium, Iris, Complementary, Fresh Animations)..." />
+            </div>
+            <div class="select-wrap sort-select">
+              <select id="modrinthSortSelect">
+                <option value="downloads" selected>En Çok İndirilen</option>
+                <option value="relevance">En Alakalı</option>
+                <option value="follows">En Çok Takip Edilen</option>
+                <option value="updated">Son Güncellenen</option>
+                <option value="newest">En Yeni</option>
+              </select>
+            </div>
+            <button class="play-btn sm-btn" id="btnModrinthSearch">
+              <span class="play-label">ARA</span>
+            </button>
+          </div>
+
+          <div class="chips" id="modrinthCategoryChips">
+            <button class="chip active" data-mcat="">Tümü</button>
+            <button class="chip" data-mcat="optimization">⚡ Optimizasyon & FPS</button>
+            <button class="chip" data-mcat="utility">🛠 Yardımcı (Utility)</button>
+            <button class="chip" data-mcat="worldgen">🌍 Dünya Oluşumu</button>
+            <button class="chip" data-mcat="magic">✨ Büyü & RPG</button>
+            <button class="chip" data-mcat="technology">⚙️ Teknoloji</button>
+            <button class="chip" data-mcat="adventure">🗡 Macera</button>
+            <button class="chip" data-mcat="decoration">🏠 Dekorasyon</button>
+          </div>
+
+          <div class="modrinth-filter-row">
+            <span class="modrinth-filter-info" id="modrinthFilterBadge">Filtre: Minecraft 1.21.4 · Fabric</span>
+            <span class="modrinth-count-info" id="modrinthCountBadge"></span>
+          </div>
+        </div>
+
+        <div class="modrinth-results stagger-2" id="modrinthResults"></div>
+        <div class="modrinth-load-more-wrap">
+          <button class="ghost-btn full hidden" id="btnModrinthLoadMore">Daha Fazla Göster (+48 İçerik Yükle)</button>
+        </div>
+      </section>
+
       <!-- ============ GÖRÜNÜM & TASARIMLAR ============ -->
       <section class="page" id="page-appearance">
         <h2 class="page-title">Görünüm ve Arayüz Tasarımı</h2>
 
         <div class="settings-grid">
-          <!-- Renk Temaları -->
           <div class="card glass wide stagger-1">
             <div class="card-head">
               <div>
@@ -234,7 +391,6 @@
             </div>
           </div>
 
-          <!-- Arayüz Yerleşim Düzeni -->
           <div class="card glass wide stagger-2">
             <div class="card-head">
               <div>
@@ -280,7 +436,6 @@
             </div>
           </div>
 
-          <!-- Animasyon Ayarları -->
           <div class="card glass stagger-3">
             <div class="card-head"><h3>Animasyonlar</h3></div>
             <div class="toggle-row">
@@ -384,7 +539,7 @@
           <div class="card glass wide stagger-3">
             <div class="card-head"><h3>Gelişmiş</h3></div>
             <div class="field">
-              <label>Oyun klasörü</label>
+              <label>Ana veri klasörü (Ortak kütüphaneler ve profiller)</label>
               <div class="inline">
                 <input id="gameDir" spellcheck="false" />
                 <button class="ghost-btn" id="btnPickDir">Değiştir</button>
@@ -492,6 +647,21 @@
         <pre class="console glass" id="console"></pre>
       </section>
     </main>
+  </div>
+
+  <!-- Çökme Analizcisi Modalı -->
+  <div class="modal-backdrop hidden" id="crashModal">
+    <div class="modal-card glass">
+      <div class="modal-head">
+        <span class="crash-badge">⚠️ Çökme Analizcisi</span>
+        <h3 id="crashTitle">Oyun Beklenmedik Şekilde Kapandı</h3>
+      </div>
+      <p class="modal-body" id="crashDetail"></p>
+      <div class="modal-actions">
+        <button class="ghost-btn" id="btnCrashConsole">Konsolu Göster</button>
+        <button class="play-btn sm-btn" id="btnCrashClose"><span class="play-label">TAMAM</span></button>
+      </div>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>

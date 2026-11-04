@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('api', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (s) => ipcRenderer.invoke('settings:save', s),
   systemInfo: () => ipcRenderer.invoke('system:info'),
+  networkStatus: () => ipcRenderer.invoke('network:status'),
 
   pickJava: () => ipcRenderer.invoke('dialog:java'),
   pickFolder: () => ipcRenderer.invoke('dialog:folder'),
@@ -22,15 +23,39 @@ contextBridge.exposeInMainWorld('api', {
 
   listVersions: () => ipcRenderer.invoke('versions:list'),
   versionJava: (id) => ipcRenderer.invoke('versions:java', id),
+  ensureBaseVersion: (id) => ipcRenderer.invoke('versions:ensureBase', id),
   scanJava: () => ipcRenderer.invoke('java:scan'),
 
+  // İzole Profiller (Instances)
+  listInstances: () => ipcRenderer.invoke('instances:list'),
+  createInstance: (data) => ipcRenderer.invoke('instances:create', data),
+  updateInstance: (data) => ipcRenderer.invoke('instances:update', data),
+  deleteInstance: (id) => ipcRenderer.invoke('instances:delete', id),
+  openInstanceFolder: (id, sub) => ipcRenderer.invoke('instances:openFolder', id, sub),
+
+  // Profil İçeriği (Mod / Shader / ResourcePack yönetimi)
+  listInstanceContent: (opts) => ipcRenderer.invoke('instance:content:list', opts),
+  toggleInstanceContent: (opts) => ipcRenderer.invoke('instance:content:toggle', opts),
+  deleteInstanceContent: (opts) => ipcRenderer.invoke('instance:content:delete', opts),
+
+  // Modrinth API
+  modrinthSearch: (opts) => ipcRenderer.invoke('modrinth:search', opts),
+  modrinthInstall: (opts) => ipcRenderer.invoke('modrinth:install', opts),
+  modrinthCheckUpdates: (opts) => ipcRenderer.invoke('modrinth:checkUpdates', opts),
+  modrinthApplyUpdates: (opts) => ipcRenderer.invoke('modrinth:applyUpdates', opts),
+  modrinthInstallFpsPack: (opts) => ipcRenderer.invoke('modrinth:installFpsPack', opts),
+  onModrinthStatus: on('modrinth:status'),
+
+  // Oyun başlatma & olaylar
   launch: (s) => ipcRenderer.invoke('game:launch', s),
   onLog: on('game:log'),
   onProgress: on('game:progress'),
   onDownload: on('game:download'),
   onState: on('game:state'),
+  onCrash: on('game:crash'),
 
-  checkForUpdates: (repo) => ipcRenderer.invoke('update:check', repo),
+  // Güncelleme
+  checkForUpdates: () => ipcRenderer.invoke('update:check'),
   downloadUpdate: (url) => ipcRenderer.invoke('update:download', url),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   onUpdateEvent: on('update:event')

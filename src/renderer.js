@@ -1,5 +1,6 @@
 // ============================================================
-//  Lumora Launcher - Arayüz mantığı (Temalar, Animasyonlar, Güncelleme)
+//  Lumora Launcher - Arayüz Mantığı
+//  (İzole Profiller, Modrinth API, Temalar, Güncelleyici, Çökme Analizcisi)
 // ============================================================
 const $ = (id) => document.getElementById(id);
 
@@ -10,6 +11,16 @@ let javaList = [];
 let requiredJava = null;
 let saveTimer = null;
 let latestUpdateInfo = null;
+
+// İzole profiller & Modrinth durumu
+let instances = [];
+let activeInstanceId = 'default-vanilla';
+let currentContentTab = 'mod';
+let currentModrinthType = 'mod';
+let currentModrinthCategory = '';
+let currentModrinthOffset = 0;
+let currentModrinthTotal = 0;
+let installedProjectIds = new Set();
 
 const THEME_LABELS = {
   aurora: 'Aurora',
@@ -25,6 +36,22 @@ const LAYOUT_LABELS = {
   minimal: 'Minimalist Odak'
 };
 
+const LOADER_LABELS = {
+  vanilla: 'Vanilla',
+  fabric: 'Fabric',
+  quilt: 'Quilt',
+  forge: 'Forge',
+  optifine: 'OptiFine'
+};
+
+const LOADER_ICONS = {
+  vanilla: '🟩',
+  fabric: '🧵',
+  quilt: '🟪',
+  forge: '⚒️',
+  optifine: '⚡'
+};
+
 // ---------------- Yardımcılar ----------------
 function toast(msg, isError = false) {
   const t = $('toast');
@@ -35,6 +62,11 @@ function toast(msg, isError = false) {
 }
 
 const gb = (mb) => `${(mb / 1024).toFixed(mb % 1024 === 0 ? 0 : 1)} GB`;
+const fmtNum = (n) => {
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `${(n / 1e3).toFixed(1)}B`;
+  return String(n || 0);
+};
 
 function log(msg, cls = '') {
   const el = $('console');
@@ -60,6 +92,10 @@ function persist(partial) {
   updateStats();
 }
 
+function getActiveInstance() {
+  return instances.find((x) => x.id === activeInstanceId) || instances[0] || null;
+}
+
 function navigateTo(page) {
   document.querySelectorAll('.nav-btn[data-page]').forEach((b) => {
     b.classList.toggle('active', b.dataset.page === page);
@@ -67,6 +103,31 @@ function navigateTo(page) {
   document.querySelectorAll('.page').forEach((p) => {
     p.classList.toggle('active', p.id === `page-${page}`);
   });
+  if (page === 'instances') {
+    refreshInstances();
+  } else if (page === 'modrinth') {
+    updateModrinthFilterBadge();
+    if (!$('modrinthResults').children.length) runModrinthSearch();
+  }
+}
+
+// ---------------- Gerçek Ağ / Mojang API Durumu ----------------
+async function checkNetworkStatus() {
+  const dot = $('netStatusDot');
+  const txt = $('netStatusText');
+  try {
+    const res = await window.api.networkStatus();
+    if (res && res.online) {
+      dot.classList.remove('offline');
+      txt.textContent = `Mojang API Aktif (${res.pingMs} ms)`;
+    } else {
+      dot.classList.add('offline');
+      txt.textContent = 'Çevrimdışı Mod (İnternet yok)';
+    }
+  } catch {
+    dot.classList.add('offline');
+    txt.textContent = 'Çevrimdışı Mod';
+  }
 }
 
 // ---------------- Açılış Animasyonu (Splash) ----------------
@@ -84,7 +145,7 @@ function playSplashIntro(force = false) {
 
   setTimeout(() => {
     fill.style.width = '55%';
-    status.textContent = 'Java ve Mojang profilleri taranıyor...';
+    status.textContent = 'İzole profiller ve Modrinth bağlantısı hazırlanıyor...';
   }, 450);
 
   setTimeout(() => {
@@ -167,8 +228,13 @@ $('btnReplaySplash').onclick = () => playSplashIntro(true);
 $('btnMin').onclick = () => window.api.minimize();
 $('btnMax').onclick = () => window.api.maximize();
 $('btnClose').onclick = () => window.api.close();
-$('btnFolder').onclick = () => window.api.openFolder(settings.gameDir);
+$('btnFolder').onclick = () => {
+  const inst = getActiveInstance();
+  if (inst) window.api.openInstanceFolder(inst.id);
+  else window.api.openFolder(settings.gameDir);
+};
 $('appVersionBadge').onclick = () => navigateTo('updates');
+$('btnManageInstances').onclick = () => navigateTo('instances');
 
 document.querySelectorAll('.nav-btn[data-page]').forEach((btn) => {
   btn.onclick = () => navigateTo(btn.dataset.page);
@@ -222,49 +288,543 @@ $('avatar').onerror = function () {
   this.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><rect width="8" height="8" fill="%237c5cff"/></svg>';
 };
 
-// ---------------- Sürümler ----------------
-function renderVersions() {
-  const sel = $('version');
+// ---------------- İzole Profiller (Instances) Yönetimi ----------------
+async function refreshInstances() {
+  instances = await window.api.listInstances();
+  if (!instances.some((x) => x.id === activeInstanceId)) {
+    activeInstanceId = instances[0] ? instances[0].id : 'default-vanilla';
+  }
+  renderInstanceSelectors();
+  renderInstanceCards();
+  await renderActiveInstanceDetails();
+  await onActiveInstanceChanged();
+}
+
+function renderInstanceSelectors() {
+  const homeSel = $('homeInstanceSelect');
+  const mrSel = $('modrinthInstanceSelect');
+  homeSel.innerHTML = '';
+  mrSel.innerHTML = '';
+
+  for (const inst of instances) {
+    const label = `${LOADER_ICONS[inst.loader] || '🟩'} ${inst.name} (${LOADER_LABELS[inst.loader]} ${inst.mcVersion})`;
+    const o1 = document.createElement('option');
+    o1.value = inst.id;
+    o1.textContent = label;
+    homeSel.appendChild(o1);
+
+    const o2 = document.createElement('option');
+    o2.value = inst.id;
+    o2.textContent = label;
+    mrSel.appendChild(o2);
+  }
+  homeSel.value = activeInstanceId;
+  mrSel.value = activeInstanceId;
+}
+
+$('homeInstanceSelect').addEventListener('change', async (e) => {
+  await selectActiveInstance(e.target.value);
+});
+
+$('modrinthInstanceSelect').addEventListener('change', async (e) => {
+  await selectActiveInstance(e.target.value);
+  updateModrinthFilterBadge();
+  runModrinthSearch();
+});
+
+async function selectActiveInstance(id) {
+  activeInstanceId = id;
+  const inst = getActiveInstance();
+  if (inst) {
+    persist({ activeInstanceId: inst.id, version: inst.mcVersion });
+  }
+  renderInstanceSelectors();
+  renderInstanceCards();
+  await renderActiveInstanceDetails();
+  await onActiveInstanceChanged();
+}
+
+function renderInstanceCards() {
+  const grid = $('instanceGrid');
+  grid.innerHTML = '';
+
+  for (const inst of instances) {
+    const card = document.createElement('div');
+    card.className = `inst-card${inst.id === activeInstanceId ? ' active' : ''}`;
+    const playMins = Math.round((inst.playTimeMs || 0) / 60000);
+    const playText = playMins > 0 ? `${playMins} dk oynandı` : 'Henüz oynanmadı';
+    const baseTag = inst.baseInstalled
+      ? `<span class="inst-tag" style="background:rgba(32,214,168,0.14);color:var(--accent-2)">✓ Ana Sürüm Hazır</span>`
+      : `<span class="inst-tag" style="background:rgba(255,184,77,0.16);color:#ffb84d">⬇ Ana Sürüm İndirilecek</span>`;
+
+    card.innerHTML = `
+      <div class="inst-card-top">
+        <div class="inst-avatar">${LOADER_ICONS[inst.loader] || '🟩'}</div>
+        <div class="inst-meta">
+          <h4></h4>
+          <div class="inst-tags">
+            <span class="inst-tag">${LOADER_LABELS[inst.loader] || 'Vanilla'}</span>
+            <span>MC ${inst.mcVersion}</span>
+            ${baseTag}
+          </div>
+        </div>
+      </div>
+      <div class="inst-card-foot">
+        <span>${inst.modsCount || 0} Mod · ${inst.shadersCount || 0} Shader · ${playText}</span>
+        <div class="inst-card-btns">
+          <button class="icon-btn" data-act="folder" title="Profil Klasörünü Aç">📁</button>
+          <button class="icon-btn danger" data-act="delete" title="Profili Sil">🗑</button>
+        </div>
+      </div>
+    `;
+    card.querySelector('h4').textContent = inst.name;
+
+    card.onclick = (ev) => {
+      const btn = ev.target.closest('button[data-act]');
+      if (btn) {
+        ev.stopPropagation();
+        if (btn.dataset.act === 'folder') {
+          window.api.openInstanceFolder(inst.id);
+        } else if (btn.dataset.act === 'delete') {
+          deleteInstancePrompt(inst);
+        }
+        return;
+      }
+      selectActiveInstance(inst.id);
+    };
+    grid.appendChild(card);
+  }
+}
+
+async function deleteInstancePrompt(inst) {
+  if (instances.length <= 1) {
+    return toast('En az bir profil kalmalıdır!', true);
+  }
+  const res = await window.api.deleteInstance(inst.id);
+  if (!res.ok) return toast(res.error, true);
+  activeInstanceId = res.activeId;
+  toast(`"${inst.name}" profili silindi`);
+  await refreshInstances();
+}
+
+async function renderActiveInstanceDetails() {
+  const inst = getActiveInstance();
+  if (!inst) return;
+
+  $('detailInstName').textContent = `${inst.name} — Kurulu İçerikler`;
+  $('detailInstBadge').textContent = `${LOADER_LABELS[inst.loader]} ${inst.mcVersion}`;
+  $('detailInstPath').textContent = `İzole Klasör: ${inst.dir}`;
+  $('btnInstallFpsPack').style.display = inst.loader === 'fabric' || inst.loader === 'quilt' ? 'inline-block' : 'none';
+
+  const baseBadge = $('detailBaseStatusBadge');
+  const prepBtn = $('btnPrepareBaseVersion');
+  if (inst.baseInstalled) {
+    baseBadge.textContent = `✓ Ana Sürüm (${inst.mcVersion}) Kurulu`;
+    baseBadge.className = 'badge ok-badge';
+    prepBtn.classList.add('hidden');
+  } else {
+    baseBadge.textContent = `⚠ Ana Sürüm (${inst.mcVersion}) Kurulu Değil`;
+    baseBadge.className = 'badge warn-badge';
+    prepBtn.classList.remove('hidden');
+  }
+
+  const items = await window.api.listInstanceContent({
+    instanceId: inst.id,
+    type: currentContentTab
+  });
+
+  // Modrinth mağazasında "Kurulu" butonlarını işaretlemek için kaydet
+  if (currentContentTab === 'mod') {
+    installedProjectIds = new Set(items.map((x) => x.projectId).filter(Boolean));
+  }
+
+  const listEl = $('installedContentList');
+  listEl.innerHTML = '';
+
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.textContent =
+      currentContentTab === 'mod'
+        ? 'Bu profilde henüz kurulu mod yok. "+ Modrinth\'ten Ekle" veya "⚡ Tek Tıkla FPS Paketi Kur" butonunu kullanabilirsin.'
+        : 'Bu kategoride henüz kurulu paket bulunmuyor.';
+    listEl.appendChild(empty);
+    return;
+  }
+
+  for (const item of items) {
+    const row = document.createElement('div');
+    row.className = `installed-item${item.enabled ? '' : ' disabled'}`;
+    const sizeKb = Math.max(1, Math.round(item.size / 1024));
+
+    row.innerHTML = `
+      <div class="installed-left">
+        ${
+          item.iconUrl
+            ? `<img class="installed-icon" src="${item.iconUrl}" alt="" />`
+            : `<div class="installed-icon">📦</div>`
+        }
+        <div class="installed-info">
+          <strong></strong>
+          <span>${item.versionNumber ? `Sürüm: ${item.versionNumber} · ` : ''}${item.baseName} (${sizeKb} KB)</span>
+        </div>
+      </div>
+      <div class="installed-actions">
+        <label class="switch" title="Etkinleştir / Devre Dışı Bırak">
+          <input type="checkbox" ${item.enabled ? 'checked' : ''} data-toggle="${item.fileName}" />
+          <span></span>
+        </label>
+        <button class="icon-btn danger" data-del="${item.fileName}" title="Kaldır">✕</button>
+      </div>
+    `;
+    row.querySelector('strong').textContent = item.title;
+
+    row.querySelector('input[data-toggle]').onchange = async () => {
+      await window.api.toggleInstanceContent({
+        instanceId: inst.id,
+        type: currentContentTab,
+        fileName: item.fileName
+      });
+      await refreshInstances();
+    };
+
+    row.querySelector('button[data-del]').onclick = async () => {
+      await window.api.deleteInstanceContent({
+        instanceId: inst.id,
+        type: currentContentTab,
+        fileName: item.fileName
+      });
+      toast(`${item.title} kaldırıldı`);
+      await refreshInstances();
+    };
+
+    listEl.appendChild(row);
+  }
+}
+
+document.querySelectorAll('#instContentTabs .sub-tab').forEach((tab) => {
+  tab.onclick = () => {
+    document.querySelectorAll('#instContentTabs .sub-tab').forEach((t) => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentContentTab = tab.dataset.ctype;
+    renderActiveInstanceDetails();
+  };
+});
+
+// Yeni profil oluşturma formu
+let selectedNewLoader = 'fabric';
+document.querySelectorAll('#newInstLoaderGroup .loader-pill').forEach((pill) => {
+  pill.onclick = () => {
+    document.querySelectorAll('#newInstLoaderGroup .loader-pill').forEach((p) => p.classList.remove('active'));
+    pill.classList.add('active');
+    selectedNewLoader = pill.dataset.loader;
+  };
+});
+
+$('btnShowCreateInstance').onclick = () => {
+  $('createInstanceBox').classList.remove('hidden');
+  $('newInstName').focus();
+};
+$('btnCancelCreateInstance').onclick = () => {
+  $('createInstanceBox').classList.add('hidden');
+};
+
+$('btnConfirmCreateInstance').onclick = async () => {
+  const name = $('newInstName').value.trim() || `${LOADER_LABELS[selectedNewLoader]} ${$('newInstVersion').value}`;
+  const mcVersion = $('newInstVersion').value || '1.21.4';
+  const created = await window.api.createInstance({
+    name,
+    mcVersion,
+    loader: selectedNewLoader
+  });
+  $('newInstName').value = '';
+  $('createInstanceBox').classList.add('hidden');
+  activeInstanceId = created.id;
+  toast(`"${created.name}" profili oluşturuldu!`);
+  await refreshInstances();
+};
+
+$('btnOpenInstFolder').onclick = () => {
+  const inst = getActiveInstance();
+  if (inst) window.api.openInstanceFolder(inst.id);
+};
+
+$('btnPrepareBaseVersion').onclick = async () => {
+  const inst = getActiveInstance();
+  if (!inst) return;
+  const btn = $('btnPrepareBaseVersion');
+  btn.disabled = true;
+  btn.textContent = `⏳ ${inst.mcVersion} İndiriliyor...`;
+  toast(`Ana sürüm (${inst.mcVersion}) indiriliyor, lütfen bekleyin...`);
+  const res = await window.api.ensureBaseVersion(inst.mcVersion);
+  btn.disabled = false;
+  btn.textContent = '⬇ Ana Sürümü Şimdi İndir';
+  if (!res.ok) return toast(res.error, true);
+  toast(`Minecraft ${inst.mcVersion} ana sürümü başarıyla indirildi! ✓`);
+  await refreshInstances();
+};
+
+$('btnOpenInstModrinth').onclick = () => {
+  currentModrinthType = currentContentTab;
+  document.querySelectorAll('#modrinthTypeTabs .sub-tab').forEach((t) => {
+    t.classList.toggle('active', t.dataset.mtype === currentModrinthType);
+  });
+  navigateTo('modrinth');
+  runModrinthSearch();
+};
+
+// Tek Tıkla FPS Paketi Kurucu
+$('btnInstallFpsPack').onclick = async () => {
+  const inst = getActiveInstance();
+  if (!inst) return;
+  const btn = $('btnInstallFpsPack');
+  btn.disabled = true;
+  btn.textContent = '⏳ FPS Paketi Kuruluyor...';
+  toast('Sodium, Lithium, FerriteCore ve Fabric API indiriliyor...');
+  const res = await window.api.modrinthInstallFpsPack({ instanceId: inst.id });
+  btn.disabled = false;
+  btn.textContent = '⚡ Tek Tıkla FPS Paketi Kur';
+
+  if (!res.ok) return toast(res.error, true);
+  toast(`FPS Paketi kuruldu! (${res.installed.length} mod eklendi)`);
+  await refreshInstances();
+};
+
+// Mod Güncellemelerini Denetle
+$('btnCheckModUpdates').onclick = async () => {
+  const inst = getActiveInstance();
+  if (!inst) return;
+  const btn = $('btnCheckModUpdates');
+  btn.disabled = true;
+  btn.textContent = '⏳ Denetleniyor...';
+  const res = await window.api.modrinthCheckUpdates({ instanceId: inst.id });
+  btn.disabled = false;
+  btn.textContent = '🔄 Mod Güncellemelerini Denetle';
+
+  if (!res.ok) return toast(res.error, true);
+  if (!res.updates || res.updates.length === 0) {
+    return toast('Tüm kurulu modların güncel! ✓');
+  }
+  toast(`${res.updates.length} mod için güncelleme bulundu, indiriliyor...`);
+  const applied = await window.api.modrinthApplyUpdates({
+    instanceId: inst.id,
+    updates: res.updates
+  });
+  if (applied.ok) {
+    toast(`${applied.count} mod başarıyla güncellendi!`);
+    await refreshInstances();
+  }
+};
+
+// ---------------- Modrinth Mağazası Arama & Kurulum (Geniş Havuz + Sayfalama) ----------------
+function updateModrinthFilterBadge() {
+  const inst = getActiveInstance();
+  if (!inst) return;
+  const typeLabel =
+    currentModrinthType === 'shader'
+      ? 'Shader Paketi'
+      : currentModrinthType === 'resourcepack'
+      ? 'Kaynak Paketi'
+      : `Mod (${LOADER_LABELS[inst.loader]})`;
+  $('modrinthFilterBadge').textContent = `Aktif Profil: ${inst.name} · Minecraft ${inst.mcVersion} · Kategori: ${typeLabel}`;
+}
+
+document.querySelectorAll('#modrinthTypeTabs .sub-tab').forEach((tab) => {
+  tab.onclick = () => {
+    document.querySelectorAll('#modrinthTypeTabs .sub-tab').forEach((t) => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentModrinthType = tab.dataset.mtype;
+    currentModrinthCategory = '';
+    document.querySelectorAll('#modrinthCategoryChips .chip').forEach((c) => {
+      c.classList.toggle('active', c.dataset.mcat === '');
+    });
+    updateModrinthFilterBadge();
+    runModrinthSearch(false);
+  };
+});
+
+document.querySelectorAll('#modrinthCategoryChips .chip').forEach((chip) => {
+  chip.onclick = () => {
+    document.querySelectorAll('#modrinthCategoryChips .chip').forEach((c) => c.classList.remove('active'));
+    chip.classList.add('active');
+    currentModrinthCategory = chip.dataset.mcat || '';
+    runModrinthSearch(false);
+  };
+});
+
+$('btnModrinthSearch').onclick = () => runModrinthSearch(false);
+$('modrinthSortSelect').onchange = () => runModrinthSearch(false);
+$('modrinthSearchInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') runModrinthSearch(false);
+});
+$('btnModrinthLoadMore').onclick = () => runModrinthSearch(true);
+
+function createModrinthCard(hit) {
+  const card = document.createElement('div');
+  card.className = 'mr-card';
+  const isInstalled = installedProjectIds.has(hit.project_id);
+
+  card.innerHTML = `
+    <img class="mr-icon" src="${hit.icon_url || 'https://cdn.modrinth.com/placeholder.svg'}" alt="" />
+    <div class="mr-body">
+      <div class="mr-head">
+        <div>
+          <div class="mr-title"></div>
+          <div class="mr-author"></div>
+        </div>
+        <button class="mr-install-btn${isInstalled ? ' installed' : ''}" data-pid="${hit.project_id}">
+          ${isInstalled ? '✓ Kurulu' : 'İndir'}
+        </button>
+      </div>
+      <p class="mr-desc"></p>
+      <div class="mr-foot">
+        <span>⬇ ${fmtNum(hit.downloads)} indirme</span>
+        <span>${(hit.categories || []).slice(0, 3).join(' · ')}</span>
+      </div>
+    </div>
+  `;
+  card.querySelector('.mr-title').textContent = hit.title;
+  card.querySelector('.mr-author').textContent = `Yazar: ${hit.author || 'Modrinth'}`;
+  card.querySelector('.mr-desc').textContent = hit.description || '';
+
+  const btn = card.querySelector('.mr-install-btn');
+  btn.onclick = async () => {
+    const targetInst = getActiveInstance();
+    if (!targetInst) return;
+    if (currentModrinthType === 'mod' && (targetInst.loader === 'vanilla' || targetInst.loader === 'optifine')) {
+      toast(
+        `${LOADER_LABELS[targetInst.loader]} profiline mod kurulamaz! Lütfen üstten Fabric/Quilt/Forge profili seçin (OptiFine'a Shader ve Kaynak Paketi kurabilirsiniz).`,
+        true
+      );
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'İndiriliyor...';
+    const res = await window.api.modrinthInstall({
+      instanceId: targetInst.id,
+      projectId: hit.project_id,
+      title: hit.title,
+      iconUrl: hit.icon_url,
+      author: hit.author,
+      projectType: currentModrinthType
+    });
+    if (!res.ok) {
+      btn.disabled = false;
+      btn.textContent = 'İndir';
+      toast(res.error, true);
+      return;
+    }
+    installedProjectIds.add(hit.project_id);
+    btn.className = 'mr-install-btn installed';
+    btn.textContent = '✓ Kuruldu';
+    const extra = res.files.length > 1 ? ` (+${res.files.length - 1} gerekli kütüphane)` : '';
+    toast(`${hit.title} kuruldu!${extra}`);
+    await refreshInstances();
+  };
+
+  return card;
+}
+
+async function runModrinthSearch(append = false) {
+  const inst = getActiveInstance();
+  if (!inst) return;
+
+  const box = $('modrinthResults');
+  const loadMoreBtn = $('btnModrinthLoadMore');
+  const countBadge = $('modrinthCountBadge');
+
+  if (!append) {
+    currentModrinthOffset = 0;
+    box.innerHTML = '<div class="empty-state" style="grid-column:span 2">Modrinth havuzu taranıyor...</div>';
+    loadMoreBtn.classList.add('hidden');
+  } else {
+    loadMoreBtn.disabled = true;
+    loadMoreBtn.textContent = '⏳ Yükleniyor...';
+  }
+
+  try {
+    const data = await window.api.modrinthSearch({
+      query: $('modrinthSearchInput').value.trim(),
+      projectType: currentModrinthType,
+      mcVersion: inst.mcVersion,
+      loader: inst.loader,
+      category: currentModrinthCategory,
+      offset: currentModrinthOffset,
+      limit: 48,
+      sort: $('modrinthSortSelect').value
+    });
+
+    if (!append) box.innerHTML = '';
+    const hits = data.hits || [];
+    currentModrinthTotal = data.total_hits || hits.length;
+
+    if (!append && hits.length === 0) {
+      box.innerHTML = `<div class="empty-state" style="grid-column:span 2">Bu sürüm (${inst.mcVersion}) ve filtre için sonuç bulunamadı.</div>`;
+      countBadge.textContent = '0 sonuç';
+      return;
+    }
+
+    for (const hit of hits) {
+      box.appendChild(createModrinthCard(hit));
+    }
+
+    currentModrinthOffset += hits.length;
+    countBadge.textContent = `${currentModrinthOffset} / ${fmtNum(currentModrinthTotal)} içerik gösteriliyor`;
+
+    if (currentModrinthOffset < currentModrinthTotal) {
+      loadMoreBtn.classList.remove('hidden');
+      loadMoreBtn.disabled = false;
+      loadMoreBtn.textContent = `Daha Fazla Göster (${currentModrinthOffset} / ${fmtNum(currentModrinthTotal)})`;
+    } else {
+      loadMoreBtn.classList.add('hidden');
+    }
+  } catch (err) {
+    if (!append) {
+      box.innerHTML = `<div class="empty-state" style="grid-column:span 2">Modrinth bağlantı hatası: ${err.message}</div>`;
+    } else {
+      toast(`Daha fazla yüklenemedi: ${err.message}`, true);
+    }
+  }
+}
+
+// ---------------- Sürümler & Java Uyumluluğu ----------------
+function renderVersionOptions() {
+  const sel = $('newInstVersion');
+  if (!sel || !versionData) return;
   sel.innerHTML = '';
-  if (!versionData) return;
   const list = versionData.versions.filter(
     (v) => v.type === 'release' || (settings.showSnapshots && v.type === 'snapshot')
   );
   for (const v of list) {
     const o = document.createElement('option');
     o.value = v.id;
-    o.textContent = v.type === 'snapshot' ? `${v.id}  (snapshot)` : v.id;
-    if (v.id === versionData.latest.release) o.textContent += '  — en yeni';
+    o.textContent = v.type === 'snapshot' ? `${v.id} (snapshot)` : v.id;
+    if (v.id === versionData.latest.release) o.textContent += ' — en yeni';
     sel.appendChild(o);
   }
-  if (settings.version && list.some((v) => v.id === settings.version)) {
-    sel.value = settings.version;
-  } else {
-    sel.value = versionData.latest.release;
-  }
-  onVersionChange();
+  sel.value = '1.21.4';
 }
 
 async function loadVersions() {
   try {
     versionData = await window.api.listVersions();
-    renderVersions();
-  } catch (e) {
-    $('version').innerHTML = '<option>İnternet bağlantısı yok</option>';
-    $('javaHint').textContent = 'Sürüm listesi alınamadı';
+    renderVersionOptions();
+    await onActiveInstanceChanged();
+  } catch {
+    $('javaHint').textContent = 'Sürüm listesi alınamadı (çevrimdışı)';
     $('javaHint').className = 'hint error';
   }
 }
 
-async function onVersionChange() {
-  const id = $('version').value;
-  persist({ version: id });
-  $('javaHint').textContent = 'Java gereksinimi kontrol ediliyor...';
+async function onActiveInstanceChanged() {
+  const inst = getActiveInstance();
+  if (!inst) return;
+  $('javaHint').textContent = 'Profil ve Java gereksinimi kontrol ediliyor...';
   $('javaHint').className = 'hint';
-  requiredJava = await window.api.versionJava(id);
+  requiredJava = await window.api.versionJava(inst.mcVersion);
   checkJavaCompat();
+  updateStats();
 }
-$('version').addEventListener('change', onVersionChange);
 
 function selectedJava() {
   return javaList.find((j) => j.path === settings.javaPath) || null;
@@ -276,22 +836,25 @@ function bestJavaFor(major) {
 
 function checkJavaCompat() {
   const hint = $('javaHint');
-  if (!requiredJava) {
+  const inst = getActiveInstance();
+  if (!requiredJava || !inst) {
     hint.innerHTML = '&nbsp;';
     return;
   }
   let java = selectedJava();
   if (!settings.javaPath) java = bestJavaFor(requiredJava);
 
+  const loaderTxt = `${LOADER_LABELS[inst.loader]} ${inst.mcVersion}`;
+  const baseStatusTxt = inst.baseInstalled ? 'Ana sürüm hazır ✓' : 'Ana sürüm otomatik indirilecek';
   if (!java) {
-    hint.textContent = `Java ${requiredJava} gerekli — bulunamadı, OYNA'ya basınca otomatik indirilecek`;
+    hint.textContent = `${loaderTxt} · ${baseStatusTxt} · Java ${requiredJava} indirilecek`;
     hint.className = 'hint warn';
   } else if (java.major < requiredJava) {
-    hint.textContent = `Bu sürüm Java ${requiredJava} istiyor, seçili: Java ${java.major}`;
+    hint.textContent = `${loaderTxt} · Java ${requiredJava} istiyor, seçili: Java ${java.major}`;
     hint.className = 'hint error';
   } else {
-    hint.textContent = `Java ${requiredJava} gerekli · Kullanılacak: Java ${java.major}${settings.javaPath ? '' : ' (otomatik)'}`;
-    hint.className = 'hint ok';
+    hint.textContent = `${loaderTxt} · ${baseStatusTxt} · Java ${java.major}${settings.javaPath ? '' : ' (oto)'} ✓`;
+    hint.className = inst.baseInstalled ? 'hint ok' : 'hint warn';
   }
   updateStats();
 }
@@ -389,7 +952,7 @@ $('height').addEventListener('change', (e) => persist({ height: Number(e.target.
 $('closeOnLaunch').addEventListener('change', (e) => persist({ closeOnLaunch: e.target.checked }));
 $('showSnapshots').addEventListener('change', (e) => {
   persist({ showSnapshots: e.target.checked });
-  renderVersions();
+  renderVersionOptions();
 });
 $('gameDir').addEventListener('change', (e) => persist({ gameDir: e.target.value.trim() }));
 $('jvmArgs').addEventListener('change', (e) => persist({ jvmArgs: e.target.value }));
@@ -403,18 +966,20 @@ $('btnPickDir').onclick = async () => {
 $('btnClearLog').onclick = () => ($('console').innerHTML = '');
 
 function updateStats() {
-  $('statRam').textContent = gb(settings.ramMax || 4096);
-  $('statScreen').textContent = settings.fullscreen ? 'Tam ekran' : `${settings.width}×${settings.height}`;
+  const inst = getActiveInstance();
+  if (inst) {
+    $('statLoader').textContent = `${LOADER_LABELS[inst.loader]} ${inst.mcVersion}`;
+    $('statMods').textContent = `${inst.modsCount || 0} Mod · ${inst.shadersCount || 0} Shader`;
+  }
   let java = selectedJava();
   if (!settings.javaPath && requiredJava) java = bestJavaFor(requiredJava);
-  $('statJava').textContent = java
-    ? `Java ${java.major}${settings.javaPath ? '' : ' · Oto'}`
-    : requiredJava ? `Java ${requiredJava} indirilecek` : 'Otomatik';
+  const jTxt = java ? `Java ${java.major}` : requiredJava ? `Java ${requiredJava}` : 'Oto';
+  $('statRam').textContent = `${gb(settings.ramMax || 4096)} · ${jTxt}`;
 }
 
+// ---------------- Güncelleme Sistemi (Sabit Resmi GitHub Deposu) ----------------
 const OFFICIAL_GITHUB_URL = 'https://github.com/lumora-launcher/lumora-launcher';
 
-// ---------------- Güncelleme Sistemi (Sabit Resmi GitHub Deposu) ----------------
 function handleUpdateEvent(ev) {
   if (!ev) return;
   const checkBtn = $('btnCheckUpdate');
@@ -505,14 +1070,23 @@ $('btnOpenGithubRepo').onclick = () => {
   window.api.openExternal(OFFICIAL_GITHUB_URL);
 };
 
-$('btnBannerUpdate').onclick = () => {
-  navigateTo('updates');
-};
-$('btnBannerDismiss').onclick = () => {
-  $('updateBanner').classList.remove('show');
-};
-
+$('btnBannerUpdate').onclick = () => navigateTo('updates');
+$('btnBannerDismiss').onclick = () => $('updateBanner').classList.remove('show');
 $('autoUpdateCheck').addEventListener('change', (e) => persist({ autoUpdateCheck: e.target.checked }));
+
+// ---------------- Çökme Analizcisi Modalı ----------------
+window.api.onCrash((info) => {
+  if (!info) return;
+  $('crashTitle').textContent = info.title || 'Oyun Beklenmedik Şekilde Kapandı';
+  $('crashDetail').textContent = info.detail || '';
+  $('crashModal').classList.remove('hidden');
+});
+
+$('btnCrashClose').onclick = () => $('crashModal').classList.add('hidden');
+$('btnCrashConsole').onclick = () => {
+  $('crashModal').classList.add('hidden');
+  navigateTo('console');
+};
 
 // ---------------- Oyunu başlat ----------------
 const playBtn = $('playBtn');
@@ -534,11 +1108,13 @@ function setProgress(text, pct) {
 
 const TASK_NAMES = {
   java: 'Java indiriliyor',
+  'base-jar': 'Ana Minecraft sürümü (Vanilla) indiriliyor',
+  optifine: 'OptiFine paketi indiriliyor ve kuruluyor',
   assets: 'Oyun dosyaları indiriliyor',
   natives: 'Native dosyalar indiriliyor',
   classes: 'Kütüphaneler indiriliyor',
-  'classes-custom': 'Kütüphaneler indiriliyor',
-  'classes-maven-custom': 'Kütüphaneler indiriliyor'
+  'classes-custom': 'Mod yükleyici kütüphaneleri indiriliyor',
+  'classes-maven-custom': 'Forge kütüphaneleri indiriliyor'
 };
 
 window.api.onProgress((p) => {
@@ -555,7 +1131,7 @@ window.api.onState((state) => {
   if (state === 'preparing') {
     playBtn.disabled = true;
     playBtn.querySelector('.play-label').textContent = 'HAZIRLANIYOR';
-    setProgress('Hazırlanıyor...', null);
+    setProgress('Profil ve mod yükleyici hazırlanıyor...', null);
   } else if (state === 'running') {
     playBtn.querySelector('.play-label').textContent = 'OYUNDA';
     setProgress('Oyun başlatıldı, iyi eğlenceler!', 100);
@@ -564,6 +1140,7 @@ window.api.onState((state) => {
     playBtn.disabled = false;
     playBtn.querySelector('.play-label').textContent = 'OYNA';
     progressWrap.classList.remove('show');
+    refreshInstances();
   }
 });
 
@@ -572,7 +1149,8 @@ playBtn.onclick = async () => {
     $('username').focus();
     return toast('Geçerli bir kullanıcı adı gir', true);
   }
-  if (!versionData) return toast('Sürüm listesi yüklenemedi', true);
+  const inst = getActiveInstance();
+  if (!inst) return toast('Lütfen bir profil seçin', true);
 
   let javaPath = settings.javaPath;
   if (!javaPath && requiredJava) {
@@ -580,8 +1158,16 @@ playBtn.onclick = async () => {
     javaPath = best ? best.path : '';
   }
 
-  log(`> ${settings.username} olarak ${settings.version} başlatılıyor (RAM: ${gb(settings.ramMax)})`, 'info');
-  const res = await window.api.launch({ ...settings, javaPath });
+  log(
+    `> ${settings.username} olarak "${inst.name}" (${LOADER_LABELS[inst.loader]} ${inst.mcVersion}) başlatılıyor...`,
+    'info'
+  );
+  const res = await window.api.launch({
+    ...settings,
+    activeInstanceId: inst.id,
+    version: inst.mcVersion,
+    javaPath
+  });
   if (!res.ok) {
     toast(res.error, true);
     log(res.error, 'err');
@@ -592,12 +1178,11 @@ playBtn.onclick = async () => {
 (async function init() {
   sys = await window.api.systemInfo();
   settings = await window.api.getSettings();
+  activeInstanceId = settings.activeInstanceId || 'default-vanilla';
 
-  // Sürüm bilgisi
   $('appVersionBadge').textContent = `v${sys.appVersion}`;
   $('currentVerText').textContent = `v${sys.appVersion}`;
 
-  // Tema, düzen ve animasyonlar
   applyTheme(settings.theme || 'aurora');
   applyLayout(settings.layoutStyle || 'modern');
   $('animationsEnabled').checked = settings.animationsEnabled !== false;
@@ -634,11 +1219,10 @@ playBtn.onclick = async () => {
   $('autoUpdateCheck').checked = settings.autoUpdateCheck !== false;
 
   updateResRow();
-  updateStats();
+  checkNetworkStatus();
 
-  await Promise.all([scanJava(), loadVersions()]);
+  await Promise.all([scanJava(), loadVersions(), refreshInstances()]);
 
-  // Açılışta resmi GitHub deposundan otomatik güncelleme kontrolü
   if (settings.autoUpdateCheck !== false) {
     window.api.checkForUpdates().catch(() => {});
   }
