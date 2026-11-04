@@ -1392,6 +1392,17 @@ function compareSemver(a, b) {
   return 0;
 }
 
+let directDownloadedInstallerPath = null;
+
+function cleanReleaseNotes(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  return raw
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<[^>]+>/g, '')
+    .trim();
+}
+
 function setupAutoUpdater() {
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
@@ -1404,7 +1415,7 @@ function setupAutoUpdater() {
     send('update:event', {
       state: 'available',
       version: info.version,
-      releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : '',
+      releaseNotes: cleanReleaseNotes(info.releaseNotes),
       releaseDate: info.releaseDate || null
     });
   });
@@ -1428,6 +1439,7 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('update-downloaded', (info) => {
+    directDownloadedInstallerPath = null;
     send('update:event', {
       state: 'downloaded',
       version: info.version,
@@ -1435,12 +1447,42 @@ function setupAutoUpdater() {
     });
   });
 
-  autoUpdater.on('error', (err) => {
-    send('update:event', {
-      state: 'error',
-      message: (err && err.message) || String(err)
-    });
+  autoUpdater.on('error', () => {
+    // Hata durumunda update:download içindeki doğrudan GitHub .exe indiricisi devreye girer
   });
+}
+
+async function downloadInstallerDirectly(exeUrl) {
+  const dest = path.join(app.getPath('temp'), `Lumora-Launcher-Update-${Date.now()}.exe`);
+  const res = await fetch(exeUrl, { headers: { 'User-Agent': USER_AGENT } });
+  if (!res.ok) throw new Error(`İndirme hatası (HTTP ${res.status})`);
+  const total = Number(res.headers.get('content-length')) || 0;
+  const reader = res.body.getReader();
+  const chunks = [];
+  let transferred = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(Buffer.from(value));
+    transferred += value.length;
+    const percent = total > 0 ? Math.round((transferred / total) * 100) : 50;
+    send('update:event', {
+      state: 'downloading',
+      percent,
+      transferred,
+      total
+    });
+  }
+
+  fs.writeFileSync(dest, Buffer.concat(chunks));
+  directDownloadedInstallerPath = dest;
+  send('update:event', {
+    state: 'downloaded',
+    version: 'Yeni Sürüm',
+    message: 'Güncelleme paketi indirildi! Şimdi yeniden başlatıp kurabilirsin.'
+  });
+  return dest;
 }
 
 async function checkOfficialGithubRelease() {
@@ -1472,7 +1514,7 @@ async function checkOfficialGithubRelease() {
       currentVersion: currentVer,
       version: latestVer,
       releaseName: data.name || `v${latestVer}`,
-      releaseNotes: data.body || 'Yeni sürüm yayınlandı.',
+      releaseNotes: cleanReleaseNotes(data.body) || 'Yeni sürüm yayınlandı.',
       releaseDate: data.published_at,
       htmlUrl: data.html_url,
       downloadUrl: exeAsset ? exeAsset.browser_download_url : data.html_url,
@@ -1484,7 +1526,7 @@ async function checkOfficialGithubRelease() {
     currentVersion: currentVer,
     version: latestVer || currentVer,
     htmlUrl: data.html_url || GITHUB_URL,
-    releaseNotes: data.body || '',
+    releaseNotes: cleanReleaseNotes(data.body) || '',
     releaseName: data.name || `v${latestVer || currentVer}`,
     message: `Lumora v${currentVer} güncel!`
   };
@@ -1522,6 +1564,18 @@ ipcMain.handle('update:download', async (_e, fallbackUrl) => {
       await autoUpdater.downloadUpdate();
       return { ok: true, mode: 'updater' };
     } catch (err) {
+      // Eğer latest.yml içindeki dosya adı ile GitHub'daki .exe adı farklıysa doğrudan .exe'yi indir
+      try {
+        let exeUrl = fallbackUrl;
+        if (!exeUrl || !/\.exe$/i.test(exeUrl)) {
+          const rel = await checkOfficialGithubRelease();
+          exeUrl = rel.downloadUrl;
+        }
+        if (exeUrl && /\.exe$/i.test(exeUrl)) {
+          await downloadInstallerDirectly(exeUrl);
+          return { ok: true, mode: 'direct-installer' };
+        }
+      } catch {}
       if (fallbackUrl) {
         shell.openExternal(fallbackUrl);
         return { ok: true, mode: 'browser' };
@@ -1529,16 +1583,29 @@ ipcMain.handle('update:download', async (_e, fallbackUrl) => {
       return { ok: false, error: err.message || String(err) };
     }
   } else {
+    if (fallbackUrl && /\.exe$/i.test(fallbackUrl)) {
+      try {
+        await downloadInstallerDirectly(fallbackUrl);
+        return { ok: true, mode: 'direct-installer' };
+      } catch {}
+    }
     if (fallbackUrl && /^https?:\/\//i.test(fallbackUrl)) {
       shell.openExternal(fallbackUrl);
       return { ok: true, mode: 'browser' };
     }
-    return { ok: false, error: 'Geliştirici modunda otomatik kurulum yapılamaz (.exe olarak paketlendiğinde aktif olur).' };
+    return { ok: false, error: 'Geliştirici modunda otomatik kurulum yapılamaz.' };
   }
 });
 
 ipcMain.handle('update:install', () => {
+  if (directDownloadedInstallerPath && fs.existsSync(directDownloadedInstallerPath)) {
+    isQuitting = true;
+    shell.openPath(directDownloadedInstallerPath);
+    setTimeout(() => app.quit(), 600);
+    return { ok: true };
+  }
   if (app.isPackaged) {
+    isQuitting = true;
     autoUpdater.quitAndInstall();
     return { ok: true };
   }
