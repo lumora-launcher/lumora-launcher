@@ -7,7 +7,9 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
+const net = require('net');
 const { execFile } = require('child_process');
+const AdmZip = require('adm-zip');
 const { Client, Authenticator } = require('minecraft-launcher-core');
 const { autoUpdater } = require('electron-updater');
 
@@ -274,7 +276,7 @@ ipcMain.handle('instances:create', (_e, data) => {
 
   // Alt klasörleri hazırla
   const dir = getInstanceDir(id);
-  for (const sub of ['mods', 'resourcepacks', 'shaderpacks', 'config', 'saves']) {
+  for (const sub of ['mods', 'resourcepacks', 'shaderpacks', 'config', 'saves', 'screenshots', 'backups']) {
     fs.mkdirSync(path.join(dir, sub), { recursive: true });
   }
 
@@ -706,6 +708,473 @@ ipcMain.handle('modrinth:installFpsPack', async (_e, { instanceId }) => {
   }
   return { ok: true, installed, skipped };
 });
+
+// ---------------- Modpack (.mrpack) İçe ve Dışa Aktarma + Modrinth Modpack Kurulumu ----------------
+async function installMrpackArchive(zipPathOrBuffer, customName) {
+  const zip = new AdmZip(zipPathOrBuffer);
+  const indexEntry = zip.getEntry('modrinth.index.json');
+  if (!indexEntry) {
+    throw new Error('Geçersiz .mrpack dosyası (modrinth.index.json bulunamadı).');
+  }
+  const index = JSON.parse(zip.readAsText(indexEntry));
+  const deps = index.dependencies || {};
+  const mcVersion = deps.minecraft || '1.21.4';
+
+  let loader = 'vanilla';
+  let loaderVersion = '';
+  if (deps['fabric-loader']) {
+    loader = 'fabric';
+    loaderVersion = deps['fabric-loader'];
+  } else if (deps['quilt-loader']) {
+    loader = 'quilt';
+    loaderVersion = deps['quilt-loader'];
+  } else if (deps.forge || deps.neoforge) {
+    loader = 'forge';
+    loaderVersion = deps.forge || deps.neoforge || '';
+  }
+
+  const packName = String(customName || index.name || 'Modpack Profili').trim().slice(0, 40);
+  const id = 'inst-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+  const inst = {
+    id,
+    name: packName,
+    mcVersion,
+    loader,
+    loaderVersion,
+    icon: loader,
+    ramMax: 0,
+    createdAt: Date.now(),
+    lastPlayed: 0,
+    playTimeMs: 0
+  };
+
+  const list = loadInstances();
+  list.unshift(inst);
+  saveInstances(list);
+
+  const instDir = getInstanceDir(id);
+  for (const sub of ['mods', 'resourcepacks', 'shaderpacks', 'config', 'saves', 'screenshots', 'backups']) {
+    fs.mkdirSync(path.join(instDir, sub), { recursive: true });
+  }
+
+  // 1) Overrides klasöründeki dosyaları (config, options, vb.) çıkart
+  for (const entry of zip.getEntries()) {
+    if (entry.isDirectory) continue;
+    const relMatch = entry.entryName.match(/^(?:overrides|client-overrides)\/(.+)$/);
+    if (relMatch && relMatch[1]) {
+      const safeRel = path.normalize(relMatch[1]).replace(/^(\.\.(\/|\\|$))+/, '');
+      const dest = path.join(instDir, safeRel);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.writeFileSync(dest, entry.getData());
+    }
+  }
+
+  // 2) files dizisindeki mod / shader / kaynak paketlerini paralel indir
+  const files = (index.files || []).filter((f) => !f.env || f.env.client !== 'unsupported');
+  let done = 0;
+  const queue = [...files];
+  const meta = loadModMetaFile(instDir);
+
+  const worker = async () => {
+    while (queue.length) {
+      const f = queue.shift();
+      const safeRel = path.normalize(f.path).replace(/^(\.\.(\/|\\|$))+/, '');
+      const dest = path.join(instDir, safeRel);
+      const urls = Array.isArray(f.downloads) ? f.downloads : [];
+      if (urls.length > 0) {
+        await downloadFileTo(urls[0], dest);
+        const baseName = path.basename(dest);
+        meta[baseName] = {
+          title: baseName.replace(/\.(jar|zip)$/i, ''),
+          versionNumber: '',
+          installedAt: Date.now()
+        };
+      }
+      done++;
+      send('game:progress', { type: 'mrpack', task: done, total: files.length });
+    }
+  };
+  await Promise.all(Array.from({ length: 8 }, worker));
+  saveModMetaFile(instDir, meta);
+
+  const s = loadSettings();
+  saveSettings({ ...s, activeInstanceId: id, version: mcVersion });
+  return enrichInstance(inst);
+}
+
+ipcMain.handle('mrpack:importFile', async () => {
+  const r = await dialog.showOpenDialog(win, {
+    title: 'Modrinth Modpack (.mrpack) Dosyası Seç',
+    filters: [{ name: 'Modrinth Modpack', extensions: ['mrpack', 'zip'] }],
+    properties: ['openFile']
+  });
+  if (r.canceled || !r.filePaths[0]) return { ok: false, canceled: true };
+  try {
+    const inst = await installMrpackArchive(r.filePaths[0]);
+    return { ok: true, instance: inst };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+ipcMain.handle('modrinth:installModpack', async (_e, { projectId, title }) => {
+  try {
+    const res = await fetch(`${MODRINTH_API}/project/${encodeURIComponent(projectId)}/version`, {
+      headers: { 'User-Agent': USER_AGENT }
+    });
+    if (!res.ok) throw new Error('Modpack sürümleri alınamadı.');
+    const versions = await res.json();
+    if (!Array.isArray(versions) || !versions.length) {
+      throw new Error('Bu modpack için indirilebilir sürüm bulunamadı.');
+    }
+    const ver = versions[0];
+    const file = ver.files.find((f) => f.primary) || ver.files[0];
+    if (!file || !file.url) throw new Error('Modpack dosyası bulunamadı.');
+
+    send('game:log', { level: 'debug', msg: `[Modrinth]: ${title} (.mrpack) indiriliyor...` });
+    const dlRes = await fetch(file.url, { headers: { 'User-Agent': USER_AGENT } });
+    if (!dlRes.ok) throw new Error(`Modpack indirilemedi (HTTP ${dlRes.status})`);
+    const buf = Buffer.from(await dlRes.arrayBuffer());
+
+    const inst = await installMrpackArchive(buf, title);
+    return { ok: true, instance: inst };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+ipcMain.handle('mrpack:exportInstance', async (_e, { instanceId }) => {
+  const list = loadInstances();
+  const inst = list.find((x) => x.id === instanceId);
+  if (!inst) return { ok: false, error: 'Profil bulunamadı.' };
+
+  const saveDialog = await dialog.showSaveDialog(win, {
+    title: 'Profili .mrpack Olarak Dışa Aktar',
+    defaultPath: `${inst.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.mrpack`,
+    filters: [{ name: 'Modrinth Modpack', extensions: ['mrpack'] }]
+  });
+  if (saveDialog.canceled || !saveDialog.filePath) return { ok: false, canceled: true };
+
+  try {
+    const instDir = getInstanceDir(inst.id);
+    const zip = new AdmZip();
+    const dependencies = { minecraft: inst.mcVersion };
+    if (inst.loader === 'fabric') dependencies['fabric-loader'] = inst.loaderVersion || '0.16.10';
+    else if (inst.loader === 'quilt') dependencies['quilt-loader'] = inst.loaderVersion || '0.26.0';
+    else if (inst.loader === 'forge') dependencies.forge = inst.loaderVersion || 'latest';
+
+    const indexJson = {
+      formatVersion: 1,
+      game: 'minecraft',
+      versionId: '1.0.0',
+      name: inst.name,
+      summary: 'Lumora Launcher ile dışa aktarıldı',
+      files: [],
+      dependencies
+    };
+
+    zip.addFile('modrinth.index.json', Buffer.from(JSON.stringify(indexJson, null, 2), 'utf8'));
+
+    for (const folder of ['mods', 'config', 'resourcepacks', 'shaderpacks']) {
+      const full = path.join(instDir, folder);
+      if (fs.existsSync(full)) {
+        zip.addLocalFolder(full, `overrides/${folder}`);
+      }
+    }
+    zip.writeZip(saveDialog.filePath);
+    return { ok: true, filePath: saveDialog.filePath };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+// ---------------- Dünya (Saves) Yöneticisi & Ekran Görüntüleri (Screenshots) ----------------
+function getFolderSize(dir) {
+  if (!fs.existsSync(dir)) return 0;
+  let total = 0;
+  const stack = [dir];
+  while (stack.length) {
+    const cur = stack.pop();
+    let entries = [];
+    try {
+      entries = fs.readdirSync(cur, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const e of entries) {
+      const p = path.join(cur, e.name);
+      if (e.isDirectory()) stack.push(p);
+      else if (e.isFile()) {
+        try {
+          total += fs.statSync(p).size;
+        } catch {}
+      }
+    }
+  }
+  return total;
+}
+
+ipcMain.handle('worlds:list', (_e, { instanceId }) => {
+  const instDir = getInstanceDir(instanceId);
+  const savesDir = path.join(instDir, 'saves');
+  const backupsDir = path.join(instDir, 'backups');
+  fs.mkdirSync(savesDir, { recursive: true });
+  fs.mkdirSync(backupsDir, { recursive: true });
+
+  const entries = fs.readdirSync(savesDir, { withFileTypes: true }).filter((e) => e.isDirectory());
+  const worlds = entries.map((e) => {
+    const wDir = path.join(savesDir, e.name);
+    const st = fs.statSync(wDir);
+    const iconFile = path.join(wDir, 'icon.png');
+    let iconData = null;
+    if (fs.existsSync(iconFile)) {
+      try {
+        iconData = 'data:image/png;base64,' + fs.readFileSync(iconFile).toString('base64');
+      } catch {}
+    }
+    return {
+      folderName: e.name,
+      lastModified: st.mtimeMs,
+      sizeBytes: getFolderSize(wDir),
+      iconData
+    };
+  });
+  worlds.sort((a, b) => b.lastModified - a.lastModified);
+
+  const backups = fs
+    .readdirSync(backupsDir, { withFileTypes: true })
+    .filter((e) => e.isFile() && /\.zip$/i.test(e.name))
+    .map((e) => {
+      const st = fs.statSync(path.join(backupsDir, e.name));
+      return { fileName: e.name, sizeBytes: st.size, createdAt: st.mtimeMs };
+    })
+    .sort((a, b) => b.createdAt - a.createdAt);
+
+  return { worlds, backups };
+});
+
+ipcMain.handle('worlds:backup', (_e, { instanceId, folderName }) => {
+  const instDir = getInstanceDir(instanceId);
+  const worldDir = path.join(instDir, 'saves', folderName);
+  if (!fs.existsSync(worldDir)) return { ok: false, error: 'Dünya klasörü bulunamadı.' };
+
+  const backupsDir = path.join(instDir, 'backups');
+  fs.mkdirSync(backupsDir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const zipName = `${folderName}_${stamp}.zip`;
+  const zipPath = path.join(backupsDir, zipName);
+
+  const zip = new AdmZip();
+  zip.addLocalFolder(worldDir, folderName);
+  zip.writeZip(zipPath);
+  return { ok: true, zipName };
+});
+
+ipcMain.handle('worlds:restore', (_e, { instanceId, backupFileName }) => {
+  const instDir = getInstanceDir(instanceId);
+  const zipPath = path.join(instDir, 'backups', backupFileName);
+  if (!fs.existsSync(zipPath)) return { ok: false, error: 'Yedek dosyası bulunamadı.' };
+
+  const savesDir = path.join(instDir, 'saves');
+  fs.mkdirSync(savesDir, { recursive: true });
+  const zip = new AdmZip(zipPath);
+  zip.extractAllTo(savesDir, true);
+  return { ok: true };
+});
+
+ipcMain.handle('worlds:delete', (_e, { instanceId, folderName }) => {
+  const instDir = getInstanceDir(instanceId);
+  const worldDir = path.join(instDir, 'saves', folderName);
+  if (fs.existsSync(worldDir)) {
+    fs.rmSync(worldDir, { recursive: true, force: true });
+  }
+  return { ok: true };
+});
+
+ipcMain.handle('screenshots:list', (_e, { instanceId }) => {
+  const instDir = getInstanceDir(instanceId);
+  const scDir = path.join(instDir, 'screenshots');
+  fs.mkdirSync(scDir, { recursive: true });
+
+  const files = fs
+    .readdirSync(scDir, { withFileTypes: true })
+    .filter((e) => e.isFile() && /\.(png|jpg|jpeg)$/i.test(e.name))
+    .map((e) => {
+      const full = path.join(scDir, e.name);
+      const st = fs.statSync(full);
+      let dataUrl = null;
+      try {
+        dataUrl = 'data:image/png;base64,' + fs.readFileSync(full).toString('base64');
+      } catch {}
+      return {
+        fileName: e.name,
+        fullPath: full,
+        createdAt: st.mtimeMs,
+        sizeBytes: st.size,
+        dataUrl
+      };
+    })
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, 36);
+  return files;
+});
+
+// ---------------- Sunucu Listesi & Canlı Ping (Minecraft SLP) ----------------
+const serversFile = () => path.join(app.getPath('userData'), 'servers.json');
+
+function defaultServers() {
+  return [
+    { id: 'srv-hypixel', name: 'Hypixel Network', address: 'mc.hypixel.net' },
+    { id: 'srv-wynncraft', name: 'Wynncraft MMORPG', address: 'play.wynncraft.com' },
+    { id: 'srv-cubecraft', name: 'CubeCraft Games', address: 'play.cubecraft.net' },
+    { id: 'srv-minemen', name: 'Minemen Club (PvP)', address: 'na.minemen.club' }
+  ];
+}
+
+function loadServers() {
+  try {
+    const list = JSON.parse(fs.readFileSync(serversFile(), 'utf8'));
+    if (Array.isArray(list)) return list;
+    return defaultServers();
+  } catch {
+    return defaultServers();
+  }
+}
+
+function saveServers(list) {
+  fs.mkdirSync(path.dirname(serversFile()), { recursive: true });
+  fs.writeFileSync(serversFile(), JSON.stringify(list, null, 2));
+}
+
+function writeVarInt(val) {
+  const bytes = [];
+  let v = val >>> 0;
+  while ((v & ~0x7f) !== 0) {
+    bytes.push((v & 0x7f) | 0x80);
+    v >>>= 7;
+  }
+  bytes.push(v & 0x7f);
+  return Buffer.from(bytes);
+}
+
+function readVarInt(buf, offset = 0) {
+  let num = 0;
+  let shift = 0;
+  let pos = offset;
+  while (pos < buf.length) {
+    const b = buf[pos++];
+    num |= (b & 0x7f) << shift;
+    if ((b & 0x80) === 0) return { value: num, nextOffset: pos };
+    shift += 7;
+    if (shift > 35) break;
+  }
+  return null;
+}
+
+function pingMinecraftServer(address, timeoutMs = 4000) {
+  const [host, portStr] = String(address || '').trim().split(':');
+  const port = Number(portStr) || 25565;
+
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const socket = new net.Socket();
+    let done = false;
+    let chunks = Buffer.alloc(0);
+
+    const finish = (res) => {
+      if (done) return;
+      done = true;
+      try {
+        socket.destroy();
+      } catch {}
+      resolve(res);
+    };
+
+    socket.setTimeout(timeoutMs);
+    socket.on('timeout', () => finish({ online: false, error: 'Zaman aşımı' }));
+    socket.on('error', () => finish({ online: false, error: 'Bağlanılamadı' }));
+
+    socket.connect(port, host, () => {
+      const pingMs = Date.now() - start;
+      const hostBuf = Buffer.from(host, 'utf8');
+      const portBuf = Buffer.alloc(2);
+      portBuf.writeUInt16BE(port, 0);
+
+      // Handshake packet (ID 0x00, protocol 767, host, port, nextState=1)
+      const handshakeBody = Buffer.concat([
+        writeVarInt(0x00),
+        writeVarInt(767),
+        writeVarInt(hostBuf.length),
+        hostBuf,
+        portBuf,
+        writeVarInt(1)
+      ]);
+      const handshakePacket = Buffer.concat([writeVarInt(handshakeBody.length), handshakeBody]);
+      const statusReqPacket = Buffer.from([0x01, 0x00]); // length 1, packet ID 0x00
+      socket.write(Buffer.concat([handshakePacket, statusReqPacket]));
+
+      socket.on('data', (chunk) => {
+        chunks = Buffer.concat([chunks, chunk]);
+        const lenInfo = readVarInt(chunks, 0);
+        if (!lenInfo) return;
+        if (chunks.length < lenInfo.nextOffset + lenInfo.value) return;
+
+        const pktIdInfo = readVarInt(chunks, lenInfo.nextOffset);
+        if (!pktIdInfo || pktIdInfo.value !== 0x00) return;
+
+        const strLenInfo = readVarInt(chunks, pktIdInfo.nextOffset);
+        if (!strLenInfo) return;
+
+        const jsonStart = strLenInfo.nextOffset;
+        const jsonEnd = jsonStart + strLenInfo.value;
+        if (chunks.length < jsonEnd) return;
+
+        try {
+          const jsonStr = chunks.slice(jsonStart, jsonEnd).toString('utf8');
+          const parsed = JSON.parse(jsonStr);
+          let motd = '';
+          if (typeof parsed.description === 'string') motd = parsed.description;
+          else if (parsed.description && parsed.description.text) motd = parsed.description.text;
+          else if (parsed.description && Array.isArray(parsed.description.extra)) {
+            motd = parsed.description.extra.map((x) => x.text || '').join('');
+          }
+          motd = motd.replace(/§[0-9a-fk-or]/gi, '').trim();
+
+          finish({
+            online: true,
+            pingMs,
+            playersOnline: parsed.players ? parsed.players.online : 0,
+            playersMax: parsed.players ? parsed.players.max : 0,
+            versionName: parsed.version ? parsed.version.name : '',
+            favicon: parsed.favicon || null,
+            motd
+          });
+        } catch {
+          finish({ online: true, pingMs, playersOnline: 0, playersMax: 0, versionName: '', motd: '' });
+        }
+      });
+    });
+  });
+}
+
+ipcMain.handle('servers:list', () => loadServers());
+ipcMain.handle('servers:add', (_e, { name, address }) => {
+  const list = loadServers();
+  const srv = {
+    id: 'srv-' + Date.now().toString(36),
+    name: String(name || address || 'Minecraft Sunucusu').trim().slice(0, 40),
+    address: String(address || '').trim()
+  };
+  list.push(srv);
+  saveServers(list);
+  return list;
+});
+ipcMain.handle('servers:delete', (_e, id) => {
+  const list = loadServers().filter((x) => x.id !== id);
+  saveServers(list);
+  return list;
+});
+ipcMain.handle('servers:ping', (_e, address) => pingMinecraftServer(address));
 
 // ---------------- Otomatik Güncelleyici (Sabit Resmi GitHub Deposu) ----------------
 function compareSemver(a, b) {
@@ -1317,6 +1786,21 @@ ipcMain.handle('game:launch', async (_e, s) => {
       overrides
     };
     if (forgeInstallerPath) opts.forge = forgeInstallerPath;
+
+    // Doğrudan sunucuya veya dünyaya bağlanma (QuickPlay - 1.20+ ve Legacy desteği)
+    if (s.quickPlayServer) {
+      const minor = parseInt(String(mcVersion).split('.')[1], 10);
+      const isModern = String(mcVersion).startsWith('26.') || minor >= 20;
+      opts.quickPlay = {
+        type: isModern ? 'multiplayer' : 'legacy',
+        identifier: s.quickPlayServer
+      };
+    } else if (s.quickPlayWorld) {
+      opts.quickPlay = {
+        type: 'singleplayer',
+        identifier: s.quickPlayWorld
+      };
+    }
 
     launcher.on('debug', (msg) => {
       const str = String(msg);

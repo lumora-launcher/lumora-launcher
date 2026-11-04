@@ -107,7 +107,9 @@ function navigateTo(page) {
     refreshInstances();
   } else if (page === 'modrinth') {
     updateModrinthFilterBadge();
-    if (!$('modrinthResults').children.length) runModrinthSearch();
+    if (!$('modrinthResults').children.length) runModrinthSearch(false);
+  } else if (page === 'servers') {
+    refreshServers();
   }
 }
 
@@ -428,6 +430,21 @@ async function renderActiveInstanceDetails() {
     prepBtn.classList.remove('hidden');
   }
 
+  const listEl = $('installedContentList');
+  listEl.innerHTML = '';
+
+  // Dünyalar & Yedekler sekmesi
+  if (currentContentTab === 'worlds') {
+    await renderWorldsTab(inst, listEl);
+    return;
+  }
+
+  // Ekran Görüntüleri sekmesi
+  if (currentContentTab === 'screenshots') {
+    await renderScreenshotsTab(inst, listEl);
+    return;
+  }
+
   const items = await window.api.listInstanceContent({
     instanceId: inst.id,
     type: currentContentTab
@@ -437,9 +454,6 @@ async function renderActiveInstanceDetails() {
   if (currentContentTab === 'mod') {
     installedProjectIds = new Set(items.map((x) => x.projectId).filter(Boolean));
   }
-
-  const listEl = $('installedContentList');
-  listEl.innerHTML = '';
 
   if (!items.length) {
     const empty = document.createElement('div');
@@ -549,6 +563,137 @@ $('btnOpenInstFolder').onclick = () => {
   if (inst) window.api.openInstanceFolder(inst.id);
 };
 
+// .mrpack İçe ve Dışa Aktarma
+$('btnImportMrpack').onclick = async () => {
+  const btn = $('btnImportMrpack');
+  btn.disabled = true;
+  btn.textContent = '⏳ İçe Aktarılıyor...';
+  const res = await window.api.importMrpackFile();
+  btn.disabled = false;
+  btn.textContent = '📦 .mrpack İçe Aktar';
+  if (res.canceled) return;
+  if (!res.ok) return toast(res.error, true);
+  activeInstanceId = res.instance.id;
+  toast(`"${res.instance.name}" modpack profili başarıyla kuruldu! 🎉`);
+  await refreshInstances();
+};
+
+$('btnExportMrpack').onclick = async () => {
+  const inst = getActiveInstance();
+  if (!inst) return;
+  const res = await window.api.exportInstanceMrpack({ instanceId: inst.id });
+  if (res.canceled) return;
+  if (!res.ok) return toast(res.error, true);
+  toast(`Profil .mrpack olarak dışa aktarıldı!`);
+};
+
+// Dünyalar & Yedekler Sekmesi
+async function renderWorldsTab(inst, container) {
+  const { worlds, backups } = await window.api.listWorlds({ instanceId: inst.id });
+
+  if (!worlds.length && !backups.length) {
+    container.innerHTML =
+      '<div class="empty-state">Bu profilde henüz oluşturulmuş bir tek oyunculu dünya (saves) veya yedek bulunmuyor.</div>';
+    return;
+  }
+
+  for (const w of worlds) {
+    const row = document.createElement('div');
+    row.className = 'installed-item';
+    const mb = (w.sizeBytes / 1024 / 1024).toFixed(1);
+    const dateStr = new Date(w.lastModified).toLocaleDateString('tr-TR');
+
+    row.innerHTML = `
+      <div class="installed-left">
+        ${w.iconData ? `<img class="installed-icon" src="${w.iconData}" alt="" />` : `<div class="installed-icon">🌍</div>`}
+        <div class="installed-info">
+          <strong></strong>
+          <span>Boyut: ${mb} MB · Son oynama: ${dateStr}</span>
+        </div>
+      </div>
+      <div class="installed-actions">
+        <button class="ghost-btn accent-border" data-play-world="${w.folderName}">▶ Bu Dünyaya Gir</button>
+        <button class="ghost-btn" data-backup-world="${w.folderName}">💾 ZIP Yedekle</button>
+        <button class="icon-btn danger" data-del-world="${w.folderName}" title="Dünyayı Sil">🗑</button>
+      </div>
+    `;
+    row.querySelector('strong').textContent = w.folderName;
+
+    row.querySelector('[data-play-world]').onclick = () => launchWithQuickPlay({ world: w.folderName });
+    row.querySelector('[data-backup-world]').onclick = async (e) => {
+      e.target.disabled = true;
+      e.target.textContent = 'Yedekleniyor...';
+      const r = await window.api.backupWorld({ instanceId: inst.id, folderName: w.folderName });
+      if (r.ok) toast(`Yedek oluşturuldu: ${r.zipName}`);
+      else toast(r.error, true);
+      await renderActiveInstanceDetails();
+    };
+    row.querySelector('[data-del-world]').onclick = async () => {
+      await window.api.deleteWorld({ instanceId: inst.id, folderName: w.folderName });
+      toast(`"${w.folderName}" dünyası silindi`);
+      await renderActiveInstanceDetails();
+    };
+    container.appendChild(row);
+  }
+
+  if (backups.length) {
+    const head = document.createElement('div');
+    head.style.cssText = 'font-size:12px;font-weight:700;color:var(--accent-2);margin:10px 0 4px';
+    head.textContent = `📦 Kayıtlı Dünya Yedekleri (${backups.length})`;
+    container.appendChild(head);
+
+    for (const b of backups) {
+      const row = document.createElement('div');
+      row.className = 'installed-item';
+      const mb = (b.sizeBytes / 1024 / 1024).toFixed(1);
+      row.innerHTML = `
+        <div class="installed-left">
+          <div class="installed-icon">🗜</div>
+          <div class="installed-info">
+            <strong></strong>
+            <span>Yedek Arşivi · ${mb} MB</span>
+          </div>
+        </div>
+        <div class="installed-actions">
+          <button class="ghost-btn" data-restore="${b.fileName}">↩ Geri Yükle</button>
+        </div>
+      `;
+      row.querySelector('strong').textContent = b.fileName;
+      row.querySelector('[data-restore]').onclick = async () => {
+        const r = await window.api.restoreWorld({ instanceId: inst.id, backupFileName: b.fileName });
+        if (r.ok) toast('Dünya yedeği başarıyla geri yüklendi! ✓');
+        else toast(r.error, true);
+        await renderActiveInstanceDetails();
+      };
+      container.appendChild(row);
+    }
+  }
+}
+
+// Ekran Görüntüleri Sekmesi
+async function renderScreenshotsTab(inst, container) {
+  const shots = await window.api.listScreenshots({ instanceId: inst.id });
+  if (!shots.length) {
+    container.innerHTML =
+      '<div class="empty-state">Bu profilde henüz çekilmiş bir ekran görüntüsü (F2) bulunmuyor.</div>';
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'screenshots-grid';
+  for (const s of shots) {
+    const card = document.createElement('div');
+    card.className = 'sc-card';
+    card.innerHTML = `
+      <img src="${s.dataUrl || ''}" alt="" />
+      <div class="sc-card-foot">${s.fileName}</div>
+    `;
+    card.onclick = () => window.api.openInstanceFolder(inst.id, 'screenshots');
+    grid.appendChild(card);
+  }
+  container.appendChild(grid);
+}
+
 $('btnPrepareBaseVersion').onclick = async () => {
   const inst = getActiveInstance();
   if (!inst) return;
@@ -621,7 +766,9 @@ function updateModrinthFilterBadge() {
   const inst = getActiveInstance();
   if (!inst) return;
   const typeLabel =
-    currentModrinthType === 'shader'
+    currentModrinthType === 'modpack'
+      ? 'Modpack (.mrpack — Yeni Profil Olarak Kurulur)'
+      : currentModrinthType === 'shader'
       ? 'Shader Paketi'
       : currentModrinthType === 'resourcepack'
       ? 'Kaynak Paketi'
@@ -688,7 +835,31 @@ function createModrinthCard(hit) {
   card.querySelector('.mr-desc').textContent = hit.description || '';
 
   const btn = card.querySelector('.mr-install-btn');
+  if (currentModrinthType === 'modpack') {
+    btn.textContent = 'Profil Olarak Kur';
+  }
   btn.onclick = async () => {
+    if (currentModrinthType === 'modpack') {
+      btn.disabled = true;
+      btn.textContent = 'Modpack Kuruluyor...';
+      toast(`${hit.title} modpack indiriliyor ve yeni profil hazırlanıyor...`);
+      const res = await window.api.modrinthInstallModpack({
+        projectId: hit.project_id,
+        title: hit.title
+      });
+      if (!res.ok) {
+        btn.disabled = false;
+        btn.textContent = 'Profil Olarak Kur';
+        return toast(res.error, true);
+      }
+      activeInstanceId = res.instance.id;
+      btn.className = 'mr-install-btn installed';
+      btn.textContent = '✓ Profil Oluşturuldu';
+      toast(`"${res.instance.name}" modpack profili hazır! 🎉`);
+      await refreshInstances();
+      return;
+    }
+
     const targetInst = getActiveInstance();
     if (!targetInst) return;
     if (currentModrinthType === 'mod' && (targetInst.loader === 'vanilla' || targetInst.loader === 'optifine')) {
@@ -1110,12 +1281,130 @@ const TASK_NAMES = {
   java: 'Java indiriliyor',
   'base-jar': 'Ana Minecraft sürümü (Vanilla) indiriliyor',
   optifine: 'OptiFine paketi indiriliyor ve kuruluyor',
+  mrpack: 'Modpack (.mrpack) içerikleri indiriliyor',
   assets: 'Oyun dosyaları indiriliyor',
   natives: 'Native dosyalar indiriliyor',
   classes: 'Kütüphaneler indiriliyor',
   'classes-custom': 'Mod yükleyici kütüphaneleri indiriliyor',
   'classes-maven-custom': 'Forge kütüphaneleri indiriliyor'
 };
+
+// ---------------- Sunucu Listesi, Canlı Ping & QuickPlay ----------------
+async function refreshServers() {
+  const listEl = $('serversList');
+  if (!listEl) return;
+  const servers = await window.api.listServers();
+  listEl.innerHTML = '';
+
+  for (const srv of servers) {
+    const card = document.createElement('div');
+    card.className = 'srv-card';
+    card.innerHTML = `
+      <div class="srv-left">
+        <div class="srv-icon" data-srv-icon>🌐</div>
+        <div class="srv-info">
+          <div class="srv-title-row">
+            <strong></strong>
+            <span class="srv-addr"></span>
+          </div>
+          <div class="srv-motd" data-srv-motd>Sunucu durumu sorgulanıyor...</div>
+        </div>
+      </div>
+      <div class="srv-right">
+        <div class="srv-stats">
+          <span class="srv-players" data-srv-players>— / —</span>
+          <span class="srv-ping" data-srv-ping>Ping...</span>
+        </div>
+        <button class="play-btn sm-btn" data-join="${srv.address}">
+          <span class="play-label">BAĞLAN ▶</span>
+        </button>
+        <button class="icon-btn danger" data-del-srv="${srv.id}" title="Sunucuyu Sil">🗑</button>
+      </div>
+    `;
+    card.querySelector('strong').textContent = srv.name;
+    card.querySelector('.srv-addr').textContent = srv.address;
+
+    card.querySelector('[data-join]').onclick = () => launchWithQuickPlay({ server: srv.address });
+    card.querySelector('[data-del-srv]').onclick = async () => {
+      await window.api.deleteServer(srv.id);
+      toast(`${srv.name} listeden kaldırıldı`);
+      refreshServers();
+    };
+
+    listEl.appendChild(card);
+
+    // Arka planda canlı ping at
+    window.api.pingServer(srv.address).then((st) => {
+      if (!card.isConnected) return;
+      const motdEl = card.querySelector('[data-srv-motd]');
+      const pEl = card.querySelector('[data-srv-players]');
+      const pingEl = card.querySelector('[data-srv-ping]');
+      const iconEl = card.querySelector('[data-srv-icon]');
+
+      if (st && st.online) {
+        motdEl.textContent = st.motd || `${srv.name} — Çevrimiçi`;
+        pEl.textContent = `${fmtNum(st.playersOnline)} / ${fmtNum(st.playersMax)} oyuncu`;
+        pingEl.textContent = `● ${st.pingMs} ms`;
+        pingEl.className = 'srv-ping';
+        if (st.favicon) {
+          iconEl.innerHTML = `<img class="srv-icon" src="${st.favicon}" alt="" />`;
+        }
+      } else {
+        motdEl.textContent = 'Sunucuya şu an ulaşılamıyor.';
+        pEl.textContent = 'Çevrimdışı';
+        pingEl.textContent = '● Kapalı';
+        pingEl.className = 'srv-ping offline';
+      }
+    });
+  }
+}
+
+$('btnRefreshServers').onclick = () => refreshServers();
+$('btnAddServer').onclick = async () => {
+  const name = $('newServerName').value.trim();
+  const address = $('newServerAddress').value.trim();
+  if (!address) return toast('Lütfen geçerli bir sunucu IP veya adresi girin', true);
+  await window.api.addServer({ name: name || address, address });
+  $('newServerName').value = '';
+  $('newServerAddress').value = '';
+  toast('Sunucu listeye eklendi!');
+  refreshServers();
+};
+
+async function launchWithQuickPlay({ server = null, world = null } = {}) {
+  if (!validateUsername()) {
+    navigateTo('home');
+    $('username').focus();
+    return toast('Önce geçerli bir kullanıcı adı girin', true);
+  }
+  const inst = getActiveInstance();
+  if (!inst) return toast('Lütfen bir profil seçin', true);
+
+  navigateTo('home');
+  let javaPath = settings.javaPath;
+  if (!javaPath && requiredJava) {
+    const best = bestJavaFor(requiredJava);
+    javaPath = best ? best.path : '';
+  }
+
+  const targetDesc = server ? ` -> Sunucu: ${server}` : world ? ` -> Dünya: ${world}` : '';
+  log(
+    `> ${settings.username} olarak "${inst.name}" (${LOADER_LABELS[inst.loader]} ${inst.mcVersion}) başlatılıyor${targetDesc}...`,
+    'info'
+  );
+  const res = await window.api.launch({
+    ...settings,
+    activeInstanceId: inst.id,
+    version: inst.mcVersion,
+    javaPath,
+    quickPlayServer: server,
+    quickPlayWorld: world
+  });
+  if (!res.ok) {
+    toast(res.error, true);
+    log(res.error, 'err');
+  }
+}
 
 window.api.onProgress((p) => {
   const pct = p.total ? (p.task / p.total) * 100 : null;
@@ -1144,35 +1433,7 @@ window.api.onState((state) => {
   }
 });
 
-playBtn.onclick = async () => {
-  if (!validateUsername()) {
-    $('username').focus();
-    return toast('Geçerli bir kullanıcı adı gir', true);
-  }
-  const inst = getActiveInstance();
-  if (!inst) return toast('Lütfen bir profil seçin', true);
-
-  let javaPath = settings.javaPath;
-  if (!javaPath && requiredJava) {
-    const best = bestJavaFor(requiredJava);
-    javaPath = best ? best.path : '';
-  }
-
-  log(
-    `> ${settings.username} olarak "${inst.name}" (${LOADER_LABELS[inst.loader]} ${inst.mcVersion}) başlatılıyor...`,
-    'info'
-  );
-  const res = await window.api.launch({
-    ...settings,
-    activeInstanceId: inst.id,
-    version: inst.mcVersion,
-    javaPath
-  });
-  if (!res.ok) {
-    toast(res.error, true);
-    log(res.error, 'err');
-  }
-};
+playBtn.onclick = () => launchWithQuickPlay();
 
 // ---------------- Başlangıç ----------------
 (async function init() {

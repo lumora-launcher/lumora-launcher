@@ -91,9 +91,13 @@
         <svg viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5Zm0 13-10-5v2l10 5 10-5v-2l-10 5Zm0 4-10-5v2l10 5 10-5v-2l-10 5Z"/></svg>
         <span>Profiller</span>
       </button>
-      <button class="nav-btn" data-page="modrinth" title="Modrinth Mağazası (Mod, Shader, Kaynak Paketi)">
+      <button class="nav-btn" data-page="modrinth" title="Modrinth Mağazası (Mod, Modpack, Shader, Kaynak Paketi)">
         <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 14.93V14h-2v2.93A8 8 0 0 1 4.07 11H7V9H4.07A8 8 0 0 1 11 4.07V7h2V4.07A8 8 0 0 1 19.93 11H17v2h2.93A8 8 0 0 1 13 16.93Z"/></svg>
         <span>Modrinth</span>
+      </button>
+      <button class="nav-btn" data-page="servers" title="Sunucu Listesi, Canlı Ping ve Tek Tıkla Bağlan">
+        <svg viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 8h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2Zm3-5a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm0 8a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg>
+        <span>Sunucular</span>
       </button>
       <button class="nav-btn" data-page="appearance" title="Görünüm & Arayüz">
         <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20 2.5 2.5 0 0 0 2.5-2.5c0-.6-.2-1.2-.6-1.6-.4-.4-.6-.9-.6-1.4a2.5 2.5 0 0 1 2.5-2.5H17a5 5 0 0 0 5-5c0-4.9-4.5-9-10-9Zm-5.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"/></svg>
@@ -202,9 +206,12 @@
             <h2 class="page-title">İzole Profiller (Instances)</h2>
             <p class="sub-sm">Her profil kendi bağımsız <code>mods</code>, <code>saves</code>, <code>shaderpacks</code> ve <code>config</code> klasörüne sahiptir.</p>
           </div>
-          <button class="play-btn sm-btn" id="btnShowCreateInstance">
-            <span class="play-label">+ YENİ PROFİL OLUŞTUR</span>
-          </button>
+          <div class="head-actions-row">
+            <button class="ghost-btn accent-border" id="btnImportMrpack" title="Bilgisayarındaki .mrpack modpack dosyasını yeni profil olarak içe aktar">📦 .mrpack İçe Aktar</button>
+            <button class="play-btn sm-btn" id="btnShowCreateInstance">
+              <span class="play-label">+ YENİ PROFİL OLUŞTUR</span>
+            </button>
+          </div>
         </div>
 
         <!-- Yeni Profil Oluşturma Kartı -->
@@ -260,15 +267,18 @@
               <button class="ghost-btn hidden" id="btnPrepareBaseVersion" title="Bu profilin ihtiyaç duyduğu ana Minecraft sürümünü şimdi indir">⬇ Ana Sürümü Şimdi İndir</button>
               <button class="ghost-btn accent-border" id="btnInstallFpsPack" title="Sodium, Lithium, FerriteCore, EntityCulling kur">⚡ Tek Tıkla FPS Paketi Kur</button>
               <button class="ghost-btn" id="btnCheckModUpdates" title="Kurulu modları Modrinth üzerinden güncelle">🔄 Mod Güncellemelerini Denetle</button>
+              <button class="ghost-btn" id="btnExportMrpack" title="Bu profili .mrpack modpack dosyası olarak dışa aktar">📤 .mrpack Dışa Aktar</button>
               <button class="ghost-btn" id="btnOpenInstModrinth">+ Modrinth'ten Ekle</button>
               <button class="ghost-btn" id="btnOpenInstFolder">Klasörü Aç</button>
             </div>
           </div>
 
           <div class="sub-tabs" id="instContentTabs">
-            <button class="sub-tab active" data-ctype="mod">Modlar</button>
-            <button class="sub-tab" data-ctype="shader">Shader Paketleri</button>
-            <button class="sub-tab" data-ctype="resourcepack">Kaynak Paketleri (Resource Packs)</button>
+            <button class="sub-tab active" data-ctype="mod">🧩 Modlar</button>
+            <button class="sub-tab" data-ctype="shader">✨ Shader</button>
+            <button class="sub-tab" data-ctype="resourcepack">🎨 Kaynak Paketleri</button>
+            <button class="sub-tab" data-ctype="worlds">🌍 Dünyalar & Yedekler</button>
+            <button class="sub-tab" data-ctype="screenshots">📸 Ekran Görüntüleri</button>
           </div>
 
           <div class="installed-list" id="installedContentList"></div>
@@ -293,6 +303,7 @@
         <div class="modrinth-toolbar glass stagger-1">
           <div class="sub-tabs" id="modrinthTypeTabs">
             <button class="sub-tab active" data-mtype="mod">🧩 Modlar</button>
+            <button class="sub-tab" data-mtype="modpack">📦 Modpack (.mrpack)</button>
             <button class="sub-tab" data-mtype="shader">✨ Shader</button>
             <button class="sub-tab" data-mtype="resourcepack">🎨 Kaynak Paketi</button>
           </div>
@@ -337,6 +348,37 @@
         <div class="modrinth-load-more-wrap">
           <button class="ghost-btn full hidden" id="btnModrinthLoadMore">Daha Fazla Göster (+48 İçerik Yükle)</button>
         </div>
+      </section>
+
+      <!-- ============ SUNUCULAR (SERVERS & QUICKPLAY) ============ -->
+      <section class="page" id="page-servers">
+        <div class="page-head-row">
+          <div>
+            <h2 class="page-title">Sunucu Listesi & Hızlı Bağlan</h2>
+            <p class="sub-sm">Favori sunucularının canlı ping ve oyuncu sayısını gör, tek tıkla doğrudan sunucuya bağlan.</p>
+          </div>
+          <div class="head-actions-row">
+            <button class="ghost-btn" id="btnRefreshServers">🔄 Tümünü Yenile</button>
+          </div>
+        </div>
+
+        <div class="card glass wide stagger-1" style="margin-bottom:16px">
+          <div class="srv-add-row">
+            <div class="field flex-1">
+              <label>Sunucu Adı</label>
+              <input id="newServerName" placeholder="Örn: Favori Survival Sunucum" maxlength="40" />
+            </div>
+            <div class="field flex-1">
+              <label>Sunucu Adresi (IP / Domain)</label>
+              <input id="newServerAddress" placeholder="Örn: mc.hypixel.net veya 127.0.0.1:25565" spellcheck="false" />
+            </div>
+            <button class="play-btn sm-btn" id="btnAddServer" style="margin-top:20px">
+              <span class="play-label">+ SUNUCU EKLE</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="servers-list stagger-2" id="serversList"></div>
       </section>
 
       <!-- ============ GÖRÜNÜM & TASARIMLAR ============ -->

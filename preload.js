@@ -38,6 +38,24 @@ contextBridge.exposeInMainWorld('api', {
   toggleInstanceContent: (opts) => ipcRenderer.invoke('instance:content:toggle', opts),
   deleteInstanceContent: (opts) => ipcRenderer.invoke('instance:content:delete', opts),
 
+  // Modpack (.mrpack) İçe / Dışa Aktarma
+  importMrpackFile: () => ipcRenderer.invoke('mrpack:importFile'),
+  exportInstanceMrpack: (opts) => ipcRenderer.invoke('mrpack:exportInstance', opts),
+  modrinthInstallModpack: (opts) => ipcRenderer.invoke('modrinth:installModpack', opts),
+
+  // Dünya (Saves) & Ekran Görüntüsü (Screenshots) Yöneticisi
+  listWorlds: (opts) => ipcRenderer.invoke('worlds:list', opts),
+  backupWorld: (opts) => ipcRenderer.invoke('worlds:backup', opts),
+  restoreWorld: (opts) => ipcRenderer.invoke('worlds:restore', opts),
+  deleteWorld: (opts) => ipcRenderer.invoke('worlds:delete', opts),
+  listScreenshots: (opts) => ipcRenderer.invoke('screenshots:list', opts),
+
+  // Sunucu Listesi & Canlı Ping
+  listServers: () => ipcRenderer.invoke('servers:list'),
+  addServer: (opts) => ipcRenderer.invoke('servers:add', opts),
+  deleteServer: (id) => ipcRenderer.invoke('servers:delete', id),
+  pingServer: (address) => ipcRenderer.invoke('servers:ping', address),
+
   // Modrinth API
   modrinthSearch: (opts) => ipcRenderer.invoke('modrinth:search', opts),
   modrinthInstall: (opts) => ipcRenderer.invoke('modrinth:install', opts),
