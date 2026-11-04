@@ -48,7 +48,7 @@
         <svg viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 2.3 6.7 3.7L12 11.7 5.3 8 12 4.3ZM5 9.7l6 3.3v6.7l-6-3.3V9.7Zm8 10V13l6-3.3v6.7l-6 3.3Z"/></svg>
       </div>
       <span class="brand-name">Lumora</span>
-      <span class="version-pill" id="appVersionBadge" title="Güncellemeleri kontrol et">v1.0.0</span>
+      <span class="version-pill" id="appVersionBadge" title="Güncellemeleri kontrol et">v1.1.0</span>
     </div>
 
     <div class="titlebar-quick">
@@ -140,17 +140,42 @@
             <img id="avatar" src="https://mc-heads.net/avatar/Steve/128" alt="avatar" />
             <div class="avatar-ring"></div>
             <span class="avatar-tag" id="avatarTag">Steve</span>
+            <span class="account-mode-pill" id="accountModeBadge">ÇEVRİMDIŞI</span>
           </div>
         </div>
 
         <div class="play-card glass stagger-2">
           <div class="field">
-            <label for="username">Kullanıcı adı</label>
-            <div class="input-icon">
-              <svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5.3 0-8 2.7-8 5v1h16v-1c0-2.3-2.7-5-8-5Z"/></svg>
-              <input id="username" maxlength="16" placeholder="Steve" spellcheck="false" autocomplete="off" />
+            <div class="field-label-row">
+              <label for="username">Oyuncu Hesabı</label>
+              <div class="auth-mode-tabs" id="authModeTabs">
+                <button type="button" class="auth-tab active" data-authmode="offline">Çevrimdışı</button>
+                <button type="button" class="auth-tab" data-authmode="microsoft">🟢 Microsoft (Orijinal)</button>
+              </div>
             </div>
-            <small class="hint" id="usernameHint">3-16 karakter, harf, rakam ve _</small>
+
+            <!-- Çevrimdışı Kullanıcı Adı Girişi -->
+            <div id="offlineAuthBox">
+              <div class="input-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5.3 0-8 2.7-8 5v1h16v-1c0-2.3-2.7-5-8-5Z"/></svg>
+                <input id="username" maxlength="16" placeholder="Steve" spellcheck="false" autocomplete="off" />
+              </div>
+              <small class="hint" id="usernameHint">3-16 karakter, harf, rakam ve _</small>
+            </div>
+
+            <!-- Microsoft (Orijinal) Hesap Seçici -->
+            <div id="microsoftAuthBox" class="hidden">
+              <div class="ms-auth-row">
+                <div class="select-wrap flex-1">
+                  <select id="msAccountSelect"></select>
+                </div>
+                <button type="button" class="ghost-btn accent-border" id="btnLoginMicrosoft" title="Resmi Microsoft / Xbox Live hesabınla giriş yap">
+                  + Microsoft Girişi
+                </button>
+                <button type="button" class="icon-btn danger" id="btnRemoveMsAccount" title="Seçili hesabı kaldır">🗑</button>
+              </div>
+              <small class="hint" id="msAccountHint">Resmi Microsoft (Xbox Live) oturumu ile orijinal sunuculara ve skin'ine eriş.</small>
+            </div>
           </div>
 
           <div class="field">
@@ -207,11 +232,27 @@
             <p class="sub-sm">Her profil kendi bağımsız <code>mods</code>, <code>saves</code>, <code>shaderpacks</code> ve <code>config</code> klasörüne sahiptir.</p>
           </div>
           <div class="head-actions-row">
+            <button class="ghost-btn" id="btnShowImportWizard" title="Bilgisayarındaki .minecraft, CurseForge, Prism veya Modrinth profillerini tek tıkla Lumora'ya kopyala">📥 Başka Launcher'dan Aktar</button>
             <button class="ghost-btn accent-border" id="btnImportMrpack" title="Bilgisayarındaki .mrpack modpack dosyasını yeni profil olarak içe aktar">📦 .mrpack İçe Aktar</button>
             <button class="play-btn sm-btn" id="btnShowCreateInstance">
               <span class="play-label">+ YENİ PROFİL OLUŞTUR</span>
             </button>
           </div>
+        </div>
+
+        <!-- Başka Launcher'dan Profil Göçü (Import Wizard) Kartı -->
+        <div class="card glass create-inst-card hidden" id="importWizardBox">
+          <div class="card-head">
+            <div>
+              <h3>📥 Başka Launcher'dan Profil Göçü (Import Wizard)</h3>
+              <small class="hint">Bilgisayarındaki mevcut <code>.minecraft</code>, CurseForge, Prism Launcher veya Modrinth profillerini modları, dünyaları ve ayarlarıyla birlikte Lumora'ya kopyala.</small>
+            </div>
+            <div class="head-actions-row">
+              <button class="ghost-btn accent-border" id="btnPickCustomImportFolder">📂 Özel Klasör Seçerek Aktar</button>
+              <button class="ghost-btn" id="btnCloseImportWizard">Kapat</button>
+            </div>
+          </div>
+          <div class="installed-list" id="externalInstancesList"></div>
         </div>
 
         <!-- Yeni Profil Oluşturma Kartı -->
@@ -561,11 +602,25 @@
           </div>
 
           <div class="card glass stagger-2">
-            <div class="card-head"><h3>Launcher</h3></div>
+            <div class="card-head"><h3>Launcher & Entegrasyonlar</h3></div>
             <div class="toggle-row">
               <div>
-                <div class="toggle-title">Oyun açılınca gizle</div>
-                <small class="hint">Oyun kapanınca launcher geri gelir</small>
+                <div class="toggle-title">Discord Rich Presence (Oynuyor Durumu)</div>
+                <small class="hint">Discord profilinde oynadığın sürümü, profili ve mod sayısını göster</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="discordRpc" checked /><span></span></label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-title">Sistem tepsisine (System Tray) küçült</div>
+                <small class="hint">Oyun çalışırken kapatıldığında arka planda sağ alt tepsiye gizlenir</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="minimizeToTray" checked /><span></span></label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-title">Oyun açılınca pencereyi gizle</div>
+                <small class="hint">Oyun kapanınca launcher otomatik geri gelir</small>
               </div>
               <label class="switch"><input type="checkbox" id="closeOnLaunch" /><span></span></label>
             </div>
@@ -612,7 +667,7 @@
                 <div>
                   <div class="update-ver-line">
                     <h3>Lumora Launcher</h3>
-                    <span class="badge" id="currentVerText">v1.0.0</span>
+                    <span class="badge" id="currentVerText">v1.1.0</span>
                     <span class="verified-pill">✓ Resmi Sürüm</span>
                   </div>
                   <p class="sub-sm" id="updateStatusTitle">Güncellemeler resmi GitHub sunucusu üzerinden otomatik denetlenir.</p>
@@ -683,8 +738,11 @@
       <!-- ============ KONSOL ============ -->
       <section class="page" id="page-console">
         <div class="console-head">
-          <h2 class="page-title">Konsol</h2>
-          <button class="ghost-btn" id="btnClearLog">Temizle</button>
+          <h2 class="page-title">Konsol & Akıllı Çökme Analizi</h2>
+          <div class="head-actions-row">
+            <button class="ghost-btn accent-border" id="btnAnalyzeCrash" title="Son oyun loglarını ve crash-reports klasörünü tarayarak hatayı Türkçe açıkla">🔍 Akıllı Çökme & Log Analizi</button>
+            <button class="ghost-btn" id="btnClearLog">Temizle</button>
+          </div>
         </div>
         <pre class="console glass" id="console"></pre>
       </section>
@@ -695,11 +753,12 @@
   <div class="modal-backdrop hidden" id="crashModal">
     <div class="modal-card glass">
       <div class="modal-head">
-        <span class="crash-badge">⚠️ Çökme Analizcisi</span>
+        <span class="crash-badge">⚠️ Akıllı Çökme Analizcisi</span>
         <h3 id="crashTitle">Oyun Beklenmedik Şekilde Kapandı</h3>
       </div>
       <p class="modal-body" id="crashDetail"></p>
       <div class="modal-actions">
+        <button class="ghost-btn accent-border hidden" id="btnCrashSearchMod">🔍 Eksik Modu Modrinth'te Ara</button>
         <button class="ghost-btn" id="btnCrashConsole">Konsolu Göster</button>
         <button class="play-btn sm-btn" id="btnCrashClose"><span class="play-label">TAMAM</span></button>
       </div>

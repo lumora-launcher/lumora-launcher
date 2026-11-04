@@ -246,11 +246,144 @@ document.querySelectorAll('.stat[data-goto]').forEach((card) => {
   card.onclick = () => navigateTo(card.dataset.goto);
 });
 
-// ---------------- Kullanıcı adı ----------------
+// ---------------- Hesap Yönetimi (Microsoft OAuth2 & Çevrimdışı) ----------------
 const USERNAME_RE = /^[A-Za-z0-9_]{3,16}$/;
 let avatarTimer = null;
+let savedMsAccounts = [];
+
+function updateAccountBadgeAndAvatar(name, isMs) {
+  const badge = $('accountModeBadge');
+  if (badge) {
+    badge.textContent = isMs ? '✓ ORİJİNAL' : 'ÇEVRİMDIŞI';
+    badge.className = `account-mode-pill${isMs ? ' ms-active' : ''}`;
+  }
+  const cleanName = (name || '').trim();
+  const h = new Date().getHours();
+  const part = h < 6 ? 'İyi geceler' : h < 12 ? 'Günaydın' : h < 18 ? 'İyi günler' : 'İyi akşamlar';
+  $('greeting').textContent = cleanName ? `${part}, ${cleanName}` : `${part}!`;
+  $('avatarTag').textContent = cleanName || 'Steve';
+
+  clearTimeout(avatarTimer);
+  avatarTimer = setTimeout(() => {
+    const valid = USERNAME_RE.test(cleanName);
+    $('avatar').src = `https://mc-heads.net/avatar/${valid ? cleanName : 'Steve'}/128`;
+  }, 250);
+}
+
+async function refreshAccountsUI() {
+  const data = await window.api.listAccounts();
+  savedMsAccounts = data.accounts || [];
+  const mode = settings.authMode || data.authMode || 'offline';
+  settings.authMode = mode;
+
+  document.querySelectorAll('#authModeTabs .auth-tab').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.authmode === mode);
+  });
+
+  $('offlineAuthBox').classList.toggle('hidden', mode === 'microsoft');
+  $('microsoftAuthBox').classList.toggle('hidden', mode !== 'microsoft');
+
+  const sel = $('msAccountSelect');
+  sel.innerHTML = '';
+  if (savedMsAccounts.length === 0) {
+    const o = document.createElement('option');
+    o.value = '';
+    o.textContent = 'Hesap eklenmedi →';
+    sel.appendChild(o);
+    $('btnRemoveMsAccount').disabled = true;
+  } else {
+    $('btnRemoveMsAccount').disabled = false;
+    for (const acc of savedMsAccounts) {
+      const o = document.createElement('option');
+      o.value = acc.id;
+      o.textContent = `🟢 ${acc.name} (Orijinal Lisans)`;
+      sel.appendChild(o);
+    }
+    const activeAcc =
+      savedMsAccounts.find((x) => x.id === settings.activeAccountId) || savedMsAccounts[0];
+    if (activeAcc) {
+      sel.value = activeAcc.id;
+      settings.activeAccountId = activeAcc.id;
+    }
+  }
+
+  if (mode === 'microsoft') {
+    const activeAcc =
+      savedMsAccounts.find((x) => x.id === settings.activeAccountId) || savedMsAccounts[0];
+    if (activeAcc) {
+      settings.username = activeAcc.name;
+      updateAccountBadgeAndAvatar(activeAcc.name, true);
+    } else {
+      updateAccountBadgeAndAvatar('Steve', true);
+    }
+  } else {
+    validateUsername();
+    updateAccountBadgeAndAvatar($('username').value.trim(), false);
+  }
+}
+
+document.querySelectorAll('#authModeTabs .auth-tab').forEach((btn) => {
+  btn.onclick = async () => {
+    const mode = btn.dataset.authmode;
+    settings.authMode = mode;
+    await window.api.selectAccount({
+      authMode: mode,
+      accountId: settings.activeAccountId
+    });
+    await refreshAccountsUI();
+  };
+});
+
+$('msAccountSelect').addEventListener('change', async (e) => {
+  const id = e.target.value;
+  settings.activeAccountId = id;
+  await window.api.selectAccount({ authMode: 'microsoft', accountId: id });
+  await refreshAccountsUI();
+});
+
+$('btnLoginMicrosoft').onclick = async () => {
+  const btn = $('btnLoginMicrosoft');
+  btn.disabled = true;
+  btn.textContent = 'Giriş Bekleniyor...';
+  try {
+    const res = await window.api.loginMicrosoft();
+    if (!res.ok) {
+      toast(res.error || 'Microsoft girişi tamamlanamadı', true);
+    } else {
+      settings.authMode = 'microsoft';
+      settings.activeAccountId = res.account.id;
+      settings.username = res.account.name;
+      toast(`Hoş geldin, ${res.account.name}! Orijinal Microsoft hesabın bağlandı ✓`);
+      await refreshAccountsUI();
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '+ Microsoft Girişi';
+  }
+};
+
+$('btnRemoveMsAccount').onclick = async () => {
+  const id = $('msAccountSelect').value;
+  if (!id) return;
+  await window.api.removeAccount(id);
+  toast('Microsoft hesabı kaldırıldı');
+  await refreshAccountsUI();
+};
 
 function validateUsername() {
+  if (settings.authMode === 'microsoft') {
+    const hasAcc = savedMsAccounts.length > 0;
+    const msHint = $('msAccountHint');
+    if (!hasAcc) {
+      msHint.textContent = 'Oyuna girmek için "+ Microsoft Girişi" butonuna tıklayın veya Çevrimdışı moda geçin.';
+      msHint.className = 'hint error';
+      return false;
+    }
+    msHint.textContent = 'Orijinal Microsoft (Xbox Live) oturumu hazır ✓';
+    msHint.className = 'hint ok';
+    return true;
+  }
+
   const v = $('username').value.trim();
   const hint = $('usernameHint');
   if (!v) {
@@ -269,21 +402,15 @@ function validateUsername() {
 }
 
 function updateGreeting() {
-  const h = new Date().getHours();
-  const part = h < 6 ? 'İyi geceler' : h < 12 ? 'Günaydın' : h < 18 ? 'İyi günler' : 'İyi akşamlar';
-  const name = $('username').value.trim();
-  $('greeting').textContent = name ? `${part}, ${name}` : `${part}!`;
-  $('avatarTag').textContent = name || 'Steve';
+  const isMs = settings.authMode === 'microsoft';
+  const name = isMs ? (settings.username || '') : $('username').value.trim();
+  updateAccountBadgeAndAvatar(name, isMs);
 }
 
 $('username').addEventListener('input', () => {
-  const ok = validateUsername();
+  validateUsername();
   updateGreeting();
-  persist({ username: $('username').value.trim() });
-  clearTimeout(avatarTimer);
-  avatarTimer = setTimeout(() => {
-    $('avatar').src = `https://mc-heads.net/avatar/${ok ? $('username').value.trim() : 'Steve'}/128`;
-  }, 500);
+  persist({ username: $('username').value.trim(), authMode: 'offline' });
 });
 $('avatar').onerror = function () {
   if (this.src.startsWith('data:')) return;
@@ -586,6 +713,73 @@ $('btnExportMrpack').onclick = async () => {
   if (!res.ok) return toast(res.error, true);
   toast(`Profil .mrpack olarak dışa aktarıldı!`);
 };
+
+// Başka Launcher'dan Profil Göçü (Import Wizard)
+$('btnShowImportWizard').onclick = async () => {
+  $('importWizardBox').classList.remove('hidden');
+  await renderExternalInstancesList();
+};
+$('btnCloseImportWizard').onclick = () => {
+  $('importWizardBox').classList.add('hidden');
+};
+$('btnPickCustomImportFolder').onclick = async () => {
+  const res = await window.api.pickCustomImportFolder();
+  if (res.canceled) return;
+  if (!res.ok) return toast(res.error, true);
+  $('importWizardBox').classList.add('hidden');
+  activeInstanceId = res.instance.id;
+  toast(`"${res.instance.name}" klasörü yeni profil olarak aktarıldı! 🎉`);
+  await refreshInstances();
+};
+
+async function renderExternalInstancesList() {
+  const listEl = $('externalInstancesList');
+  listEl.innerHTML = '<div class="empty-state">Bilgisayarındaki Minecraft kurulumları taranıyor...</div>';
+  const items = await window.api.scanExternalInstances();
+  listEl.innerHTML = '';
+
+  if (!items || items.length === 0) {
+    listEl.innerHTML =
+      '<div class="empty-state">Standart konumlarda (.minecraft, CurseForge, Prism, Modrinth) kurulu profil bulunamadı. Sağ üstteki "📂 Özel Klasör Seçerek Aktar" butonunu kullanabilirsin.</div>';
+    return;
+  }
+
+  for (const item of items) {
+    const row = document.createElement('div');
+    row.className = 'installed-item';
+    row.innerHTML = `
+      <div class="installed-left">
+        <div class="installed-icon">${LOADER_ICONS[item.loader] || '📦'}</div>
+        <div class="installed-info">
+          <strong></strong>
+          <span>Kaynak: ${item.sourceName} · ${LOADER_LABELS[item.loader] || 'Vanilla'} ${item.mcVersion} · ${item.modsCount} Mod · ${item.savesCount} Dünya · ${item.shadersCount} Shader</span>
+        </div>
+      </div>
+      <div class="installed-actions">
+        <button class="play-btn sm-btn" data-migrate>
+          <span class="play-label">📥 LUMORA'YA AKTAR</span>
+        </button>
+      </div>
+    `;
+    row.querySelector('strong').textContent = item.name;
+    row.querySelector('[data-migrate]').onclick = async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      btn.querySelector('.play-label').textContent = 'AKTARILIYOR...';
+      const res = await window.api.migrateExternalFolder(item);
+      if (!res.ok) {
+        btn.disabled = false;
+        btn.querySelector('.play-label').textContent = "📥 LUMORA'YA AKTAR";
+        return toast(res.error, true);
+      }
+      $('importWizardBox').classList.add('hidden');
+      activeInstanceId = res.instance.id;
+      toast(`"${res.instance.name}" (${item.modsCount} mod, ${item.savesCount} dünya) başarıyla Lumora'ya aktarıldı! 🎉`);
+      await refreshInstances();
+    };
+    listEl.appendChild(row);
+  }
+}
 
 // Dünyalar & Yedekler Sekmesi
 async function renderWorldsTab(inst, container) {
@@ -1120,6 +1314,8 @@ $('fullscreen').addEventListener('change', (e) => {
 });
 $('width').addEventListener('change', (e) => persist({ width: Number(e.target.value) || 1280 }));
 $('height').addEventListener('change', (e) => persist({ height: Number(e.target.value) || 720 }));
+$('discordRpc').addEventListener('change', (e) => persist({ discordRpc: e.target.checked }));
+$('minimizeToTray').addEventListener('change', (e) => persist({ minimizeToTray: e.target.checked }));
 $('closeOnLaunch').addEventListener('change', (e) => persist({ closeOnLaunch: e.target.checked }));
 $('showSnapshots').addEventListener('change', (e) => {
   persist({ showSnapshots: e.target.checked });
@@ -1245,13 +1441,40 @@ $('btnBannerUpdate').onclick = () => navigateTo('updates');
 $('btnBannerDismiss').onclick = () => $('updateBanner').classList.remove('show');
 $('autoUpdateCheck').addEventListener('change', (e) => persist({ autoUpdateCheck: e.target.checked }));
 
-// ---------------- Çökme Analizcisi Modalı ----------------
-window.api.onCrash((info) => {
+// ---------------- Çökme Analizcisi Modalı & Manuel Log Analizi ----------------
+let lastMissingModId = null;
+
+function showCrashModal(info) {
   if (!info) return;
   $('crashTitle').textContent = info.title || 'Oyun Beklenmedik Şekilde Kapandı';
   $('crashDetail').textContent = info.detail || '';
+  lastMissingModId = info.missingMod || null;
+  const searchBtn = $('btnCrashSearchMod');
+  if (lastMissingModId) {
+    searchBtn.textContent = `🔍 "${lastMissingModId}" Modunu Modrinth'te Ara`;
+    searchBtn.classList.remove('hidden');
+  } else {
+    searchBtn.classList.add('hidden');
+  }
   $('crashModal').classList.remove('hidden');
-});
+}
+
+window.api.onCrash((info) => showCrashModal(info));
+
+$('btnAnalyzeCrash').onclick = async () => {
+  const logsText = $('console').textContent || '';
+  const info = await window.api.analyzeInstanceCrash({ logsText });
+  showCrashModal(info);
+};
+
+$('btnCrashSearchMod').onclick = () => {
+  $('crashModal').classList.add('hidden');
+  if (lastMissingModId) {
+    $('modrinthSearchInput').value = lastMissingModId;
+    navigateTo('modrinth');
+    runModrinthSearch(false);
+  }
+};
 
 $('btnCrashClose').onclick = () => $('crashModal').classList.add('hidden');
 $('btnCrashConsole').onclick = () => {
@@ -1473,6 +1696,8 @@ playBtn.onclick = () => launchWithQuickPlay();
   $('fullscreen').checked = !!settings.fullscreen;
   $('width').value = settings.width;
   $('height').value = settings.height;
+  $('discordRpc').checked = settings.discordRpc !== false;
+  $('minimizeToTray').checked = settings.minimizeToTray !== false;
   $('closeOnLaunch').checked = !!settings.closeOnLaunch;
   $('showSnapshots').checked = !!settings.showSnapshots;
   $('gameDir').value = settings.gameDir;
@@ -1482,7 +1707,7 @@ playBtn.onclick = () => launchWithQuickPlay();
   updateResRow();
   checkNetworkStatus();
 
-  await Promise.all([scanJava(), loadVersions(), refreshInstances()]);
+  await Promise.all([scanJava(), loadVersions(), refreshInstances(), refreshAccountsUI()]);
 
   if (settings.autoUpdateCheck !== false) {
     window.api.checkForUpdates().catch(() => {});

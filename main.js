@@ -2,7 +2,7 @@
 //  Lumora Launcher - Ana süreç (Electron main process)
 //  Resmi GitHub: https://github.com/lumora-launcher/lumora-launcher
 // ============================================================
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -25,16 +25,21 @@ const MODRINTH_API = 'https://api.modrinth.com/v2';
 const USER_AGENT = `Lumora-Launcher/${getAppVersion()} (github.com/lumora-launcher/lumora-launcher)`;
 
 let win = null;
+let tray = null;
+let isQuitting = false;
 let gameRunning = false;
 let manifestCache = null;
 
 // ---------------- Ayarlar & Profiller (Instances) ----------------
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 const instancesFile = () => path.join(app.getPath('userData'), 'instances.json');
+const accountsFile = () => path.join(app.getPath('userData'), 'accounts.json');
 
 function defaultSettings() {
   return {
     username: '',
+    authMode: 'offline', // 'offline' | 'microsoft'
+    activeAccountId: '',
     version: '',
     activeInstanceId: 'default-vanilla',
     ramMax: Math.min(4096, Math.floor(os.totalmem() / 1024 / 1024 / 2 / 512) * 512),
@@ -45,6 +50,8 @@ function defaultSettings() {
     gameDir: path.join(app.getPath('appData'), '.lumora'),
     showSnapshots: false,
     closeOnLaunch: true,
+    minimizeToTray: true,
+    discordRpc: true,
     jvmArgs: '',
     theme: 'aurora',
     layoutStyle: 'modern',
@@ -124,6 +131,178 @@ function getInstanceDir(instanceId, baseGameDir) {
   return dir;
 }
 
+// ---------------- Sistem Tepsisi (System Tray) & Discord Rich Presence ----------------
+function setupTray() {
+  if (tray) return;
+  const iconPath = path.join(__dirname, 'assets', 'icon.ico');
+  const pngPath = path.join(__dirname, 'assets', 'icon.png');
+  const targetIcon = fs.existsSync(iconPath) ? iconPath : pngPath;
+  if (!fs.existsSync(targetIcon)) return;
+
+  try {
+    tray = new Tray(nativeImage.createFromPath(targetIcon));
+    tray.setToolTip(`${APP_NAME} Launcher v${getAppVersion()}`);
+    const updateMenu = () => {
+      const s = loadSettings();
+      const instances = loadInstances();
+      const activeInst = instances.find((x) => x.id === s.activeInstanceId) || instances[0];
+      const menu = Menu.buildFromTemplate([
+        {
+          label: `${APP_NAME} Launcher v${getAppVersion()}`,
+          enabled: false
+        },
+        { type: 'separator' },
+        {
+          label: 'Launcher Penceresini Göster',
+          click: () => {
+            if (win) {
+              win.show();
+              win.focus();
+            }
+          }
+        },
+        {
+          label: `Aktif Profil Klasörü (${activeInst ? activeInst.name : 'Varsayılan'})`,
+          click: () => {
+            const dir = getInstanceDir(activeInst ? activeInst.id : 'default-vanilla', s.gameDir);
+            shell.openPath(dir);
+          }
+        },
+        {
+          label: 'Ana Lumora Klasörünü Aç',
+          click: () => {
+            fs.mkdirSync(s.gameDir, { recursive: true });
+            shell.openPath(s.gameDir);
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Tamamen Çıkış Yap',
+          click: () => {
+            isQuitting = true;
+            app.quit();
+          }
+        }
+      ]);
+      tray.setContextMenu(menu);
+    };
+    updateMenu();
+    tray.on('click', () => {
+      if (!win) return;
+      if (win.isVisible()) {
+        win.focus();
+      } else {
+        win.show();
+        win.focus();
+      }
+    });
+  } catch {
+    // Tray oluşturulamazsa sessizce devam et
+  }
+}
+
+// Saf Node.js Discord IPC (Rich Presence) İstemcisi
+const DISCORD_CLIENT_ID = '1214954349014515762'; // Genel Minecraft / Lumora RPC Uygulama Kimliği
+let discordSocket = null;
+let discordReady = false;
+let lastDiscordState = null;
+
+function encodeDiscordFrame(op, data) {
+  const payload = Buffer.from(JSON.stringify(data), 'utf8');
+  const frame = Buffer.alloc(8 + payload.length);
+  frame.writeInt32LE(op, 0);
+  frame.writeInt32LE(payload.length, 4);
+  payload.copy(frame, 8);
+  return frame;
+}
+
+function connectDiscordRpc(pipeIndex = 0) {
+  if (discordSocket || pipeIndex > 9) return;
+  if (!loadSettings().discordRpc) return;
+
+  const pipePath = `\\\\?\\pipe\\discord-ipc-${pipeIndex}`;
+  const sock = net.createConnection(pipePath);
+  let connected = false;
+
+  sock.once('connect', () => {
+    connected = true;
+    discordSocket = sock;
+    sock.write(encodeDiscordFrame(0, { v: 1, client_id: DISCORD_CLIENT_ID }));
+  });
+
+  sock.on('data', () => {
+    if (!discordReady) {
+      discordReady = true;
+      if (lastDiscordState) setDiscordActivity(lastDiscordState);
+    }
+  });
+
+  sock.once('error', () => {
+    sock.destroy();
+    if (!connected) {
+      connectDiscordRpc(pipeIndex + 1);
+    } else {
+      discordSocket = null;
+      discordReady = false;
+    }
+  });
+
+  sock.once('close', () => {
+    if (discordSocket === sock) {
+      discordSocket = null;
+      discordReady = false;
+    }
+  });
+}
+
+function setDiscordActivity(activity) {
+  lastDiscordState = activity;
+  const s = loadSettings();
+  if (!s.discordRpc) {
+    if (discordSocket) {
+      try {
+        discordSocket.write(encodeDiscordFrame(1, { cmd: 'SET_ACTIVITY', args: { pid: process.pid, activity: null }, nonce: crypto.randomUUID() }));
+        discordSocket.destroy();
+      } catch {}
+      discordSocket = null;
+      discordReady = false;
+    }
+    return;
+  }
+
+  if (!discordSocket) {
+    connectDiscordRpc(0);
+    return;
+  }
+  if (!discordReady) return;
+
+  try {
+    discordSocket.write(
+      encodeDiscordFrame(1, {
+        cmd: 'SET_ACTIVITY',
+        args: {
+          pid: process.pid,
+          activity: {
+            details: activity.details || 'Lumora Launcher',
+            state: activity.state || 'Menüde Geziyor',
+            timestamps: { start: activity.startTimestamp || Date.now() },
+            assets: {
+              large_image: 'minecraft',
+              large_text: `Lumora Launcher v${getAppVersion()}`
+            },
+            buttons: [
+              { label: 'Lumora Launcher (GitHub)', url: GITHUB_URL }
+            ]
+          }
+        },
+        nonce: crypto.randomUUID()
+      })
+    );
+  } catch {
+    // Sessizce geç
+  }
+}
+
 // ---------------- Pencere ----------------
 function createWindow() {
   const iconPath = path.join(__dirname, 'assets', 'icon.ico');
@@ -149,7 +328,16 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
+  setupTray();
   setupAutoUpdater();
+  setDiscordActivity({
+    details: 'Menüde Geziyor',
+    state: 'Profil Hazırlanıyor',
+    startTimestamp: Date.now()
+  });
+});
+app.on('before-quit', () => {
+  isQuitting = true;
 });
 app.on('window-all-closed', () => app.quit());
 
@@ -160,12 +348,28 @@ const send = (channel, payload) => {
 // ---------------- Pencere kontrolleri ----------------
 ipcMain.on('win:minimize', () => win.minimize());
 ipcMain.on('win:maximize', () => (win.isMaximized() ? win.unmaximize() : win.maximize()));
-ipcMain.on('win:close', () => win.close());
+ipcMain.on('win:hideToTray', () => {
+  if (win) win.hide();
+});
+ipcMain.on('win:close', () => {
+  if (gameRunning && loadSettings().minimizeToTray && win) {
+    win.hide();
+  } else if (win) {
+    isQuitting = true;
+    win.close();
+  }
+});
 
 // ---------------- Ayar IPC ----------------
 ipcMain.handle('settings:get', () => loadSettings());
 ipcMain.handle('settings:save', (_e, s) => {
-  saveSettings({ ...loadSettings(), ...s });
+  const merged = { ...loadSettings(), ...s };
+  saveSettings(merged);
+  if (!merged.discordRpc) {
+    setDiscordActivity(lastDiscordState || { details: 'Menüde Geziyor', state: 'Hazır' });
+  } else if (!discordSocket) {
+    connectDiscordRpc(0);
+  }
   return true;
 });
 ipcMain.handle('system:info', () => ({
@@ -1676,47 +1880,606 @@ async function downloadJavaRuntime(component, gameDir) {
   return javaw;
 }
 
-// ---------------- Çökme Analizcisi (Crash Analyzer) ----------------
-function analyzeCrashLog(logsText, code) {
-  if (code === 0) return null;
-  if (/UnsupportedClassVersionError/i.test(logsText)) {
-    return {
-      title: 'Java Sürümü Uyumsuzluğu',
-      detail: 'Seçili Minecraft sürümü veya modlardan biri daha yeni bir Java sürümü gerektiriyor. Ayarlar > Java kısmını "Otomatik" moda alıp tekrar deneyin.'
-    };
+// ---------------- Resmi Microsoft (Xbox Live) Hesap Girişi & Çoklu Hesap Yöneticisi ----------------
+const MS_CLIENT_ID = '00000000402b5328';
+const MS_REDIRECT_URI = 'https://login.live.com/oauth20_desktop.srf';
+const MS_AUTH_URL =
+  `https://login.live.com/oauth20_authorize.srf?client_id=${MS_CLIENT_ID}` +
+  `&response_type=code&scope=${encodeURIComponent('service::user.auth.xboxlive.com::MBI_SSL')}` +
+  `&redirect_uri=${encodeURIComponent(MS_REDIRECT_URI)}&prompt=select_account`;
+
+function loadAccounts() {
+  try {
+    const list = JSON.parse(fs.readFileSync(accountsFile(), 'utf8'));
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
   }
-  if (/OutOfMemoryError/i.test(logsText)) {
-    return {
-      title: 'Yetersiz Bellek (RAM)',
-      detail: 'Oyuna ayrılan RAM doldu. Ayarlar sekmesinden RAM miktarını artırıp tekrar başlatın.'
-    };
+}
+
+function saveAccounts(list) {
+  fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
+  fs.writeFileSync(accountsFile(), JSON.stringify(list, null, 2));
+}
+
+async function exchangeCodeOrRefreshForMcAccount(paramsObj) {
+  // 1) Microsoft OAuth2 Token
+  const tokenRes = await fetch('https://login.live.com/oauth20_token.srf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: MS_CLIENT_ID,
+      redirect_uri: MS_REDIRECT_URI,
+      ...paramsObj
+    }).toString()
+  });
+  if (!tokenRes.ok) {
+    throw new Error(`Microsoft OAuth hatası (HTTP ${tokenRes.status})`);
   }
-  if (/Incompatible mods found|Mod resolution failed|net\.fabricmc\.loader\.impl\.FormattedException/i.test(logsText)) {
-    const missingMatch = logsText.match(/requires ([a-z0-9_-]+)/i);
-    return {
-      title: 'Eksik veya Uyumsuz Mod Tespit Edildi',
-      detail: missingMatch
-        ? `Yüklü modlardan biri "${missingMatch[1]}" moduna (örn. Fabric API) ihtiyaç duyuyor. Modrinth sekmesinden eksik kütüphaneyi kurun.`
-        : 'Profillerdeki bazı modlar birbiriyle veya seçili Minecraft sürümüyle uyumsuz. Konsol sekmesindeki hata detayını kontrol edin.'
-    };
+  const msToken = await tokenRes.json();
+
+  // 2) Xbox Live (XBL) Doğrulaması
+  const xblRes = await fetch('https://user.auth.xboxlive.com/user/authenticate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      Properties: {
+        AuthMethod: 'RPS',
+        SiteName: 'user.auth.xboxlive.com',
+        RpsTicket: `d=${msToken.access_token}`
+      },
+      RelyingParty: 'http://auth.xboxlive.com',
+      TokenType: 'JWT'
+    })
+  });
+  if (!xblRes.ok) {
+    throw new Error(`Xbox Live doğrulaması başarısız oldu (HTTP ${xblRes.status})`);
   }
+  const xblData = await xblRes.json();
+  const uhs = xblData.DisplayClaims?.xui?.[0]?.uhs;
+  if (!uhs) throw new Error('Xbox Live kullanıcı kimliği (UHS) alınamadı.');
+
+  // 3) XSTS Doğrulaması
+  const xstsRes = await fetch('https://xsts.auth.xboxlive.com/xsts/authorize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      Properties: {
+        SandboxId: 'RETAIL',
+        UserTokens: [xblData.Token]
+      },
+      RelyingParty: 'rp://api.minecraftservices.com/',
+      TokenType: 'JWT'
+    })
+  });
+  if (!xstsRes.ok) {
+    const errJson = await xstsRes.json().catch(() => ({}));
+    if (errJson.XErr === 2148916233) {
+      throw new Error('Bu Microsoft hesabına bağlı bir Xbox profili bulunamadı.');
+    }
+    if (errJson.XErr === 2148916238) {
+      throw new Error('Reşit olmayan hesaplar için ebeveyn (Xbox Aile) izni gereklidir.');
+    }
+    throw new Error(`XSTS doğrulaması başarısız oldu (HTTP ${xstsRes.status})`);
+  }
+  const xstsData = await xstsRes.json();
+
+  // 4) Minecraft Services Login
+  const mcLoginRes = await fetch('https://api.minecraftservices.com/authentication/login_with_xbox', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      identityToken: `XBL3.0 x=${uhs};${xstsData.Token}`
+    })
+  });
+  if (!mcLoginRes.ok) {
+    throw new Error(`Minecraft oturumu açılamadı (HTTP ${mcLoginRes.status})`);
+  }
+  const mcLogin = await mcLoginRes.json();
+
+  // 5) Minecraft Oyuncu Profili (Orijinal Lisans Kontrolü)
+  const profileRes = await fetch('https://api.minecraftservices.com/minecraft/profile', {
+    headers: { Authorization: `Bearer ${mcLogin.access_token}` }
+  });
+  if (!profileRes.ok) {
+    throw new Error('Bu Microsoft hesabında orijinal Minecraft: Java Edition lisansı bulunamadı.');
+  }
+  const profile = await profileRes.json();
+  if (!profile || !profile.id || !profile.name) {
+    throw new Error('Minecraft oyuncu profili alınamadı.');
+  }
+
   return {
-    title: `Oyun Beklenmedik Şekilde Kapandı (Kod: ${code})`,
-    detail: 'Detaylı hata raporu için sol menüdeki Konsol sekmesini inceleyebilirsiniz.'
+    id: profile.id,
+    uuid: profile.id,
+    name: profile.name,
+    type: 'microsoft',
+    accessToken: mcLogin.access_token,
+    refreshToken: msToken.refresh_token || paramsObj.refresh_token || '',
+    expiresAt: Date.now() + (Number(mcLogin.expires_in) || 86400) * 1000 - 120000
   };
 }
 
-// ---------------- Oyunu başlat (İzole Profil + Mod Yükleyici Desteği) ----------------
-ipcMain.handle('game:launch', async (_e, s) => {
-  if (gameRunning) return { ok: false, error: 'Oyun zaten çalışıyor.' };
-  saveSettings({ ...loadSettings(), ...s });
+ipcMain.handle('auth:listAccounts', () => {
+  const s = loadSettings();
+  return {
+    accounts: loadAccounts().map((a) => ({
+      id: a.id,
+      uuid: a.uuid,
+      name: a.name,
+      type: a.type
+    })),
+    authMode: s.authMode || 'offline',
+    activeAccountId: s.activeAccountId || ''
+  };
+});
 
+ipcMain.handle('auth:loginMicrosoft', async () => {
+  return new Promise((resolve) => {
+    const authWin = new BrowserWindow({
+      width: 520,
+      height: 660,
+      parent: win || undefined,
+      modal: true,
+      title: 'Microsoft Hesabı ile Giriş Yap — Lumora Launcher',
+      backgroundColor: '#0b0d14',
+      autoHideMenuBar: true,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true
+      }
+    });
+
+    let resolved = false;
+    const finish = (result) => {
+      if (resolved) return;
+      resolved = true;
+      try {
+        if (!authWin.isDestroyed()) authWin.close();
+      } catch {}
+      resolve(result);
+    };
+
+    const handleUrl = async (urlStr) => {
+      if (!urlStr || !urlStr.startsWith(MS_REDIRECT_URI)) return;
+      try {
+        const u = new URL(urlStr);
+        const code = u.searchParams.get('code');
+        const err = u.searchParams.get('error');
+        if (err) {
+          return finish({ ok: false, error: 'Microsoft girişi iptal edildi.' });
+        }
+        if (!code) return;
+
+        const acc = await exchangeCodeOrRefreshForMcAccount({
+          grant_type: 'authorization_code',
+          code
+        });
+
+        const accounts = loadAccounts().filter((x) => x.id !== acc.id);
+        accounts.unshift(acc);
+        saveAccounts(accounts);
+
+        const s = loadSettings();
+        s.authMode = 'microsoft';
+        s.activeAccountId = acc.id;
+        s.username = acc.name;
+        saveSettings(s);
+
+        finish({
+          ok: true,
+          account: { id: acc.id, uuid: acc.uuid, name: acc.name, type: acc.type }
+        });
+      } catch (e) {
+        finish({ ok: false, error: e.message || String(e) });
+      }
+    };
+
+    authWin.webContents.on('will-redirect', (_e, url) => handleUrl(url));
+    authWin.webContents.on('did-navigate', (_e, url) => handleUrl(url));
+    authWin.on('closed', () => finish({ ok: false, error: 'Giriş penceresi kapatıldı.' }));
+    authWin.loadURL(MS_AUTH_URL);
+  });
+});
+
+ipcMain.handle('auth:selectAccount', (_e, { authMode, accountId }) => {
+  const s = loadSettings();
+  s.authMode = authMode === 'microsoft' ? 'microsoft' : 'offline';
+  if (s.authMode === 'microsoft' && accountId) {
+    const acc = loadAccounts().find((x) => x.id === accountId);
+    if (acc) {
+      s.activeAccountId = acc.id;
+      s.username = acc.name;
+    }
+  }
+  saveSettings(s);
+  return { ok: true, settings: s };
+});
+
+ipcMain.handle('auth:removeAccount', (_e, accountId) => {
+  const accounts = loadAccounts().filter((x) => x.id !== accountId);
+  saveAccounts(accounts);
+  const s = loadSettings();
+  if (s.activeAccountId === accountId) {
+    s.activeAccountId = accounts[0] ? accounts[0].id : '';
+    if (!s.activeAccountId) s.authMode = 'offline';
+    saveSettings(s);
+  }
+  return { ok: true };
+});
+
+async function getAuthorizationForLaunch(s) {
+  if (s.authMode === 'microsoft') {
+    const accounts = loadAccounts();
+    let acc = accounts.find((x) => x.id === s.activeAccountId) || accounts[0];
+    if (!acc) {
+      throw new Error('Kayıtlı bir Microsoft hesabı bulunamadı. Lütfen önce Microsoft ile giriş yapın veya Çevrimdışı moda geçin.');
+    }
+    if (Date.now() > (acc.expiresAt || 0) && acc.refreshToken) {
+      send('game:log', { level: 'debug', msg: `[Lumora]: Microsoft oturum anahtarı (${acc.name}) yenileniyor...` });
+      acc = await exchangeCodeOrRefreshForMcAccount({
+        grant_type: 'refresh_token',
+        refresh_token: acc.refreshToken
+      });
+      const updated = accounts.map((x) => (x.id === acc.id ? acc : x));
+      saveAccounts(updated);
+    }
+    return {
+      access_token: acc.accessToken,
+      client_token: acc.uuid,
+      uuid: acc.uuid,
+      name: acc.name,
+      user_properties: '{}',
+      meta: {
+        type: 'msa',
+        demo: false
+      }
+    };
+  }
+  return Authenticator.getAuth(s.username);
+}
+
+// ---------------- Diğer Launcher'lardan Profil Göçü (Import Wizard) ----------------
+function inspectExternalInstanceDir(dir, sourceName, fallbackName) {
+  if (!fs.existsSync(dir)) return null;
+  try {
+    let name = fallbackName || path.basename(dir);
+    let mcVersion = '1.21.4';
+    let loader = 'vanilla';
+
+    // 1) CurseForge: minecraftinstance.json
+    const cfFile = path.join(dir, 'minecraftinstance.json');
+    if (fs.existsSync(cfFile)) {
+      try {
+        const cf = JSON.parse(fs.readFileSync(cfFile, 'utf8'));
+        if (cf.name) name = cf.name;
+        if (cf.gameVersion) mcVersion = cf.gameVersion;
+        const ml = JSON.stringify(cf.baseModLoader || {}).toLowerCase();
+        if (ml.includes('fabric')) loader = 'fabric';
+        else if (ml.includes('quilt')) loader = 'quilt';
+        else if (ml.includes('forge')) loader = 'forge';
+      } catch {}
+    }
+
+    // 2) Prism / MultiMC: mmc-pack.json & instance.cfg
+    const mmcRoot = fs.existsSync(path.join(dir, 'mmc-pack.json'))
+      ? dir
+      : fs.existsSync(path.join(path.dirname(dir), 'mmc-pack.json'))
+      ? path.dirname(dir)
+      : null;
+    if (mmcRoot) {
+      try {
+        const mmc = JSON.parse(fs.readFileSync(path.join(mmcRoot, 'mmc-pack.json'), 'utf8'));
+        for (const comp of mmc.components || []) {
+          if (comp.uid === 'net.minecraft' && comp.version) mcVersion = comp.version;
+          if (comp.uid === 'net.fabricmc.fabric-loader') loader = 'fabric';
+          if (comp.uid === 'org.quiltmc.quilt-loader') loader = 'quilt';
+          if (comp.uid === 'net.minecraftforge') loader = 'forge';
+        }
+        const cfgPath = path.join(mmcRoot, 'instance.cfg');
+        if (fs.existsSync(cfgPath)) {
+          const cfgText = fs.readFileSync(cfgPath, 'utf8');
+          const m = cfgText.match(/^name=(.+)$/m);
+          if (m && m[1]) name = m[1].trim();
+        }
+      } catch {}
+    }
+
+    // 3) Resmi .minecraft / versions klasörü
+    const versionsDir = path.join(dir, 'versions');
+    if (fs.existsSync(versionsDir)) {
+      try {
+        const vers = fs.readdirSync(versionsDir);
+        const rel = vers.find((v) => /^1\.\d+(\.\d+)?$/.test(v));
+        if (rel) mcVersion = rel;
+        if (vers.some((v) => /fabric/i.test(v))) loader = 'fabric';
+        else if (vers.some((v) => /optifine/i.test(v))) loader = 'optifine';
+        else if (vers.some((v) => /forge/i.test(v))) loader = 'forge';
+      } catch {}
+    }
+
+    const modsCount = countDirFiles(path.join(dir, 'mods'), /\.jar(\.disabled)?$/i);
+    const savesCount = fs.existsSync(path.join(dir, 'saves'))
+      ? fs.readdirSync(path.join(dir, 'saves'), { withFileTypes: true }).filter((d) => d.isDirectory()).length
+      : 0;
+    const packsCount = countDirFiles(path.join(dir, 'resourcepacks'), /\.zip$/i);
+    const shadersCount = countDirFiles(path.join(dir, 'shaderpacks'), /\.zip$/i);
+
+    if (modsCount > 0 && loader === 'vanilla') loader = 'fabric';
+
+    return {
+      sourceName,
+      name,
+      dir,
+      mcVersion,
+      loader,
+      modsCount,
+      savesCount,
+      packsCount,
+      shadersCount
+    };
+  } catch {
+    return null;
+  }
+}
+
+ipcMain.handle('import:scanExternal', () => {
+  const results = [];
+  const appData = app.getPath('appData');
+  const home = app.getPath('home');
+
+  // 1) Resmi .minecraft
+  const dotMc = path.join(appData, '.minecraft');
+  if (fs.existsSync(dotMc)) {
+    const info = inspectExternalInstanceDir(dotMc, 'Resmi Minecraft (.minecraft)', 'Resmi .minecraft Profilim');
+    if (info) results.push(info);
+  }
+
+  // 2) CurseForge Instances
+  const cfInstances = path.join(home, 'curseforge', 'minecraft', 'Instances');
+  if (fs.existsSync(cfInstances)) {
+    try {
+      for (const d of fs.readdirSync(cfInstances, { withFileTypes: true })) {
+        if (d.isDirectory()) {
+          const info = inspectExternalInstanceDir(path.join(cfInstances, d.name), 'CurseForge', d.name);
+          if (info) results.push(info);
+        }
+      }
+    } catch {}
+  }
+
+  // 3) Prism Launcher & MultiMC Instances
+  for (const [label, rootDir] of [
+    ['Prism Launcher', path.join(appData, 'PrismLauncher', 'instances')],
+    ['MultiMC', path.join(appData, 'MultiMC', 'instances')]
+  ]) {
+    if (fs.existsSync(rootDir)) {
+      try {
+        for (const d of fs.readdirSync(rootDir, { withFileTypes: true })) {
+          if (!d.isDirectory() || d.name.startsWith('_')) continue;
+          const mcSub = path.join(rootDir, d.name, '.minecraft');
+          const minecraftSub = path.join(rootDir, d.name, 'minecraft');
+          const target = fs.existsSync(mcSub) ? mcSub : fs.existsSync(minecraftSub) ? minecraftSub : null;
+          if (target) {
+            const info = inspectExternalInstanceDir(target, label, d.name);
+            if (info) results.push(info);
+          }
+        }
+      } catch {}
+    }
+  }
+
+  // 4) Modrinth App Profiles
+  for (const mrPath of [
+    path.join(appData, 'ModrinthApp', 'profiles'),
+    path.join(appData, 'com.modrinth.theseus', 'profiles')
+  ]) {
+    if (fs.existsSync(mrPath)) {
+      try {
+        for (const d of fs.readdirSync(mrPath, { withFileTypes: true })) {
+          if (d.isDirectory()) {
+            const info = inspectExternalInstanceDir(path.join(mrPath, d.name), 'Modrinth App', d.name);
+            if (info) results.push(info);
+          }
+        }
+      } catch {}
+    }
+  }
+
+  return results;
+});
+
+function copyFolderRecursiveSync(src, dest) {
+  if (!fs.existsSync(src)) return;
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const sPath = path.join(src, entry.name);
+    const dPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyFolderRecursiveSync(sPath, dPath);
+    } else {
+      fs.copyFileSync(sPath, dPath);
+    }
+  }
+}
+
+function migrateExternalDirectoryToLumora(info) {
+  const list = loadInstances();
+  const id = `migrated-${Date.now().toString(36)}`;
+  const newInst = {
+    id,
+    name: String(info.name || 'İçe Aktarılan Profil').slice(0, 42),
+    mcVersion: info.mcVersion || '1.21.4',
+    loader: info.loader || 'fabric',
+    loaderVersion: '',
+    icon: info.loader || 'grass',
+    ramMax: 0,
+    createdAt: Date.now(),
+    lastPlayed: 0,
+    playTimeMs: 0
+  };
+  list.push(newInst);
+  saveInstances(list);
+
+  const destDir = getInstanceDir(id);
+  for (const sub of ['mods', 'saves', 'shaderpacks', 'resourcepacks', 'config']) {
+    const srcSub = path.join(info.dir, sub);
+    if (fs.existsSync(srcSub)) {
+      copyFolderRecursiveSync(srcSub, path.join(destDir, sub));
+    }
+  }
+  for (const file of ['options.txt', 'optionsof.txt', 'servers.dat']) {
+    const srcFile = path.join(info.dir, file);
+    if (fs.existsSync(srcFile)) {
+      fs.copyFileSync(srcFile, path.join(destDir, file));
+    }
+  }
+
+  return enrichInstance(newInst);
+}
+
+ipcMain.handle('import:migrateFolder', async (_e, info) => {
+  try {
+    if (!info || !info.dir || !fs.existsSync(info.dir)) {
+      throw new Error('Kaynak klasör bulunamadı.');
+    }
+    const inst = migrateExternalDirectoryToLumora(info);
+    return { ok: true, instance: inst };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+ipcMain.handle('import:pickCustomFolder', async () => {
+  const r = await dialog.showOpenDialog(win, {
+    title: 'İçe Aktarılacak Minecraft / Profil Klasörünü Seçin',
+    properties: ['openDirectory']
+  });
+  if (r.canceled || !r.filePaths[0]) return { ok: false, canceled: true };
+  const chosenDir = r.filePaths[0];
+  const subMc = path.join(chosenDir, '.minecraft');
+  const actualDir = fs.existsSync(subMc) ? subMc : chosenDir;
+  const info = inspectExternalInstanceDir(actualDir, 'Özel Klasör', path.basename(chosenDir));
+  if (!info) return { ok: false, error: 'Seçilen klasör geçerli bir Minecraft klasörü değil.' };
+  const inst = migrateExternalDirectoryToLumora(info);
+  return { ok: true, instance: inst };
+});
+
+// ---------------- Gelişmiş Akıllı Çökme Analizcisi (Smart Crash Analyzer) ----------------
+function readLatestCrashOrLogFile(instanceDir) {
+  if (!instanceDir || !fs.existsSync(instanceDir)) return '';
+  let extra = '';
+  try {
+    const crashDir = path.join(instanceDir, 'crash-reports');
+    if (fs.existsSync(crashDir)) {
+      const files = fs
+        .readdirSync(crashDir)
+        .filter((f) => f.endsWith('.txt'))
+        .map((f) => ({ name: f, mtime: fs.statSync(path.join(crashDir, f)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime);
+      if (files[0]) {
+        extra += '\n' + fs.readFileSync(path.join(crashDir, files[0].name), 'utf8').slice(0, 20000);
+      }
+    }
+    const latestLog = path.join(instanceDir, 'logs', 'latest.log');
+    if (fs.existsSync(latestLog)) {
+      extra += '\n' + fs.readFileSync(latestLog, 'utf8').slice(-20000);
+    }
+  } catch {}
+  return extra;
+}
+
+function analyzeCrashLog(logsText, code, instanceDir) {
+  const combined = `${logsText || ''}\n${readLatestCrashOrLogFile(instanceDir)}`;
+  if (code === 0 && !/Exception|Error|CrashReport/i.test(combined)) return null;
+
+  if (/UnsupportedClassVersionError/i.test(combined)) {
+    const classVer = combined.match(/class file version (\d+)\.0/i);
+    const reqJava =
+      classVer && Number(classVer[1]) >= 65
+        ? 'Java 21'
+        : classVer && Number(classVer[1]) >= 61
+        ? 'Java 17'
+        : 'daha yeni bir Java';
+    return {
+      title: `Java Sürümü Uyumsuzluğu (${reqJava} Gerekli)`,
+      detail: `Seçili Minecraft sürümü veya kurulu modlardan biri ${reqJava} gerektiriyor. Ayarlar > Java kısmını "Otomatik" moda aldığınızda Lumora uygun resmi Java sürümünü kendisi indirip kullanacaktır.`,
+      suggestedAction: 'java-auto'
+    };
+  }
+  if (/OutOfMemoryError/i.test(combined)) {
+    return {
+      title: 'Yetersiz Bellek (Java Heap Space / RAM Doldu)',
+      detail: 'Oyuna veya mod paketine ayrılan RAM miktarı yetersiz kaldı. Ayarlar sekmesinden RAM çubuğunu 4 GB veya 6 GB seviyesine yükseltip tekrar deneyin.',
+      suggestedAction: 'increase-ram'
+    };
+  }
+  if (/optifine/i.test(combined) && /(sodium|iris)/i.test(combined)) {
+    return {
+      title: 'OptiFine ile Sodium / Iris Çakışması',
+      detail: 'OptiFine ve Sodium/Iris aynı anda çalışamaz. Profiller sekmesinden birini devre dışı bırakıp tekrar başlatın.',
+      suggestedAction: 'open-mods'
+    };
+  }
+  if (/Incompatible mods found|Mod resolution failed|net\.fabricmc\.loader\.impl\.FormattedException|MissingModsException/i.test(combined)) {
+    const missingMatch =
+      combined.match(/requires ([a-z0-9_-]{3,})/i) ||
+      combined.match(/Mod ID:\s*'([a-z0-9_-]+)'/i);
+    const missingMod = missingMatch ? missingMatch[1] : null;
+    return {
+      title: missingMod ? `Eksik Kütüphane Modu: "${missingMod}"` : 'Eksik veya Uyumsuz Mod Tespit Edildi',
+      detail: missingMod
+        ? `Yüklü modlardan biri çalışmak için "${missingMod}" (örn. Fabric API, Cloth Config, Architectury) kütüphanesine ihtiyaç duyuyor. Modrinth mağazasından bu modu tek tıkla kurabilirsiniz.`
+        : 'Profildeki bazı modlar birbiriyle veya seçili Minecraft sürümüyle uyumsuz. Profiller sekmesinden son eklediğiniz modu kapatıp tekrar deneyin.',
+      missingMod
+    };
+  }
+  if (/MixinApplyError|MixinTransformerError|spongepowered\.asm\.mixin/i.test(combined)) {
+    const mixinMatch = combined.match(/from mod ([a-z0-9_-]+)/i);
+    return {
+      title: mixinMatch ? `"${mixinMatch[1]}" Modu Çökmeye Sebep Oldu (Mixin Hatası)` : 'Mod Enjeksiyon (Mixin) Çakışması',
+      detail: mixinMatch
+        ? `"${mixinMatch[1]}" modu oyun koduna müdahale ederken çakışma yaşadı. Bu modu Profiller sekmesinden güncellemeyi veya devre dışı bırakmayı deneyin.`
+        : 'İki farklı mod aynı oyun özelliğini değiştirmeye çalıştığı için çakıştı. Mod Güncellemelerini Denetle butonunu kullanın.'
+    };
+  }
+  if (/GLFW error 65542|WGL: The driver does not appear to support OpenGL/i.test(combined)) {
+    return {
+      title: 'Ekran Kartı Sürücüsü (OpenGL) Hatası',
+      detail: 'Ekran kartı sürücünüz güncel OpenGL sürümünü başlatamadı. Ekran kartı (NVIDIA / AMD / Intel) sürücünüzü güncelleyin.'
+    };
+  }
+  return {
+    title: code !== undefined && code !== 0 ? `Oyun Beklenmedik Şekilde Kapandı (Kod: ${code})` : 'Log Tarama Sonucu',
+    detail: 'Kritik bir bilinen mod/Java çakışması imzası bulunamadı veya oyun normal kapandı. Detaylı satırlar için Konsol çıktısını inceleyebilirsiniz.'
+  };
+}
+
+ipcMain.handle('crash:analyzeInstance', (_e, { logsText } = {}) => {
+  const s = loadSettings();
   const instances = loadInstances();
   const activeInst = instances.find((x) => x.id === s.activeInstanceId) || instances[0];
-  const mcVersion = activeInst ? activeInst.mcVersion : s.version;
-  const loader = activeInst ? activeInst.loader : 'vanilla';
   const instanceDir = getInstanceDir(activeInst ? activeInst.id : 'default-vanilla', s.gameDir);
-  const ramMax = (activeInst && activeInst.ramMax > 0) ? activeInst.ramMax : s.ramMax;
+  return (
+    analyzeCrashLog(logsText || '', 1, instanceDir) || {
+      title: 'Sorun Tespit Edilmedi',
+      detail: 'Aktif profilin son oyun kayıtlarında (latest.log / crash-reports) bilinen bir çökme hatası bulunmadı.'
+    }
+  );
+});
+
+// ---------------- Oyunu başlat (İzole Profil + Mod Yükleyici + Microsoft Auth Desteği) ----------------
+ipcMain.handle('game:launch', async (_e, s) => {
+  if (gameRunning) return { ok: false, error: 'Oyun zaten çalışıyor.' };
+  const mergedSettings = { ...loadSettings(), ...s };
+  saveSettings(mergedSettings);
+
+  const instances = loadInstances();
+  const activeInst = instances.find((x) => x.id === mergedSettings.activeInstanceId) || instances[0];
+  const mcVersion = activeInst ? activeInst.mcVersion : mergedSettings.version;
+  const loader = activeInst ? activeInst.loader : 'vanilla';
+  const instanceDir = getInstanceDir(activeInst ? activeInst.id : 'default-vanilla', mergedSettings.gameDir);
+  const ramMax = (activeInst && activeInst.ramMax > 0) ? activeInst.ramMax : mergedSettings.ramMax;
 
   const m = await getManifest().catch(() => null);
   const meta = m && m.versions.find((v) => v.id === mcVersion);
@@ -1729,23 +2492,26 @@ ipcMain.handle('game:launch', async (_e, s) => {
     gameRunning = true;
     send('game:state', 'preparing');
 
+    // 0) Hesap Doğrulaması (Microsoft Orijinal veya Offline)
+    const authPayload = await getAuthorizationForLaunch(mergedSettings);
+
     // 1) Java hazırla
-    let javaExe = s.javaPath;
+    let javaExe = mergedSettings.javaPath;
     if (!javaExe) {
       const vjson = await getVersionJson(mcVersion);
       const component = (vjson.javaVersion && vjson.javaVersion.component) || 'jre-legacy';
-      javaExe = await downloadJavaRuntime(component, s.gameDir);
+      javaExe = await downloadJavaRuntime(component, mergedSettings.gameDir);
     }
 
     // 2) Önce ana (Vanilla) sürümün (.jar + .json) tam olduğundan emin ol
-    await ensureBaseVanillaVersion(mcVersion, s.gameDir);
+    await ensureBaseVanillaVersion(mcVersion, mergedSettings.gameDir);
 
     // 3) Mod Loader (Fabric / Quilt / Forge / OptiFine) hazırla
     const versionConfig = {
       number: mcVersion,
       type: meta ? meta.type : 'release'
     };
-    const vanillaDir = path.join(s.gameDir, 'versions', mcVersion);
+    const vanillaDir = path.join(mergedSettings.gameDir, 'versions', mcVersion);
     const overrides = {
       detached: false,
       gameDirectory: instanceDir,
@@ -1762,27 +2528,27 @@ ipcMain.handle('game:launch', async (_e, s) => {
         loader,
         mcVersion,
         activeInst.loaderVersion,
-        s.gameDir
+        mergedSettings.gameDir
       );
     } else if (loader === 'optifine') {
-      versionConfig.custom = await prepareOptiFineProfile(mcVersion, s.gameDir, javaExe);
+      versionConfig.custom = await prepareOptiFineProfile(mcVersion, mergedSettings.gameDir, javaExe);
     } else if (loader === 'forge') {
-      forgeInstallerPath = await prepareForgeInstaller(mcVersion, s.gameDir);
+      forgeInstallerPath = await prepareForgeInstaller(mcVersion, mergedSettings.gameDir);
     }
 
     const opts = {
-      authorization: Authenticator.getAuth(s.username),
-      root: s.gameDir,
+      authorization: authPayload,
+      root: mergedSettings.gameDir,
       version: versionConfig,
       javaPath: javaExe,
       memory: {
         max: `${ramMax}M`,
         min: `${Math.min(1024, ramMax)}M`
       },
-      window: s.fullscreen
+      window: mergedSettings.fullscreen
         ? { fullscreen: true }
-        : { width: Number(s.width) || 1280, height: Number(s.height) || 720 },
-      customArgs: (s.jvmArgs || '').split(' ').map((a) => a.trim()).filter(Boolean),
+        : { width: Number(mergedSettings.width) || 1280, height: Number(mergedSettings.height) || 720 },
+      customArgs: (mergedSettings.jvmArgs || '').split(' ').map((a) => a.trim()).filter(Boolean),
       overrides
     };
     if (forgeInstallerPath) opts.forge = forgeInstallerPath;
@@ -1802,6 +2568,17 @@ ipcMain.handle('game:launch', async (_e, s) => {
       };
     }
 
+    const modsCount = countDirFiles(path.join(instanceDir, 'mods'), /\.jar$/i);
+    setDiscordActivity({
+      details: `${activeInst ? activeInst.name : 'Minecraft'} (${loader.toUpperCase()} ${mcVersion})`,
+      state: s.quickPlayServer
+        ? `Sunucu: ${s.quickPlayServer}`
+        : modsCount > 0
+        ? `${modsCount} Mod ile oynuyor`
+        : 'Oyunda',
+      startTimestamp: launchStart
+    });
+
     launcher.on('debug', (msg) => {
       const str = String(msg);
       recentLogs += str + '\n';
@@ -1817,10 +2594,15 @@ ipcMain.handle('game:launch', async (_e, s) => {
     launcher.on('download-status', (d) => send('game:download', d));
     launcher.on('arguments', () => {
       send('game:state', 'running');
-      if (s.closeOnLaunch) setTimeout(() => win && win.hide(), 2500);
+      if (mergedSettings.closeOnLaunch) setTimeout(() => win && win.hide(), 2500);
     });
     launcher.on('close', (code) => {
       gameRunning = false;
+      setDiscordActivity({
+        details: 'Menüde Geziyor',
+        state: 'Hazır',
+        startTimestamp: Date.now()
+      });
       // Oynama süresini kaydet
       if (activeInst) {
         const list = loadInstances();
@@ -1835,7 +2617,7 @@ ipcMain.handle('game:launch', async (_e, s) => {
       send('game:log', { level: 'debug', msg: `Oyun kapandı (kod: ${code})` });
       if (win && !win.isVisible()) win.show();
 
-      const crashInfo = analyzeCrashLog(recentLogs, code);
+      const crashInfo = analyzeCrashLog(recentLogs, code, instanceDir);
       if (crashInfo) send('game:crash', crashInfo);
     });
 

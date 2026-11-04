@@ -9,12 +9,27 @@ const on = (channel) => (cb) => {
 contextBridge.exposeInMainWorld('api', {
   minimize: () => ipcRenderer.send('win:minimize'),
   maximize: () => ipcRenderer.send('win:maximize'),
+  hideToTray: () => ipcRenderer.send('win:hideToTray'),
   close: () => ipcRenderer.send('win:close'),
 
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (s) => ipcRenderer.invoke('settings:save', s),
   systemInfo: () => ipcRenderer.invoke('system:info'),
   networkStatus: () => ipcRenderer.invoke('network:status'),
+
+  // Hesap Yönetimi (Microsoft OAuth2 & Offline)
+  listAccounts: () => ipcRenderer.invoke('auth:listAccounts'),
+  loginMicrosoft: () => ipcRenderer.invoke('auth:loginMicrosoft'),
+  selectAccount: (opts) => ipcRenderer.invoke('auth:selectAccount', opts),
+  removeAccount: (id) => ipcRenderer.invoke('auth:removeAccount', id),
+
+  // Başka Launcher'dan Profil Göçü (Import Wizard)
+  scanExternalInstances: () => ipcRenderer.invoke('import:scanExternal'),
+  migrateExternalFolder: (info) => ipcRenderer.invoke('import:migrateFolder', info),
+  pickCustomImportFolder: () => ipcRenderer.invoke('import:pickCustomFolder'),
+
+  // Akıllı Çökme & Log Analizi
+  analyzeInstanceCrash: (opts) => ipcRenderer.invoke('crash:analyzeInstance', opts),
 
   pickJava: () => ipcRenderer.invoke('dialog:java'),
   pickFolder: () => ipcRenderer.invoke('dialog:folder'),
