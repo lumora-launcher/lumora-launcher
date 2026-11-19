@@ -1494,8 +1494,9 @@ function handleUpdateEvent(ev) {
     progWrap.classList.add('hidden');
     dlBtn.classList.add('hidden');
     instBtn.classList.remove('hidden');
-    title.textContent = `v${ev.version} indirildi! Kurulum için yeniden başlatmaya hazır.`;
-    toast('Güncelleme indirildi!');
+    title.textContent =
+      ev.message || 'Güncelleme indirildi! Kurulum sihirbazı açılmadan arka planda sessizce güncellenip yeniden başlatılıyor...';
+    toast('Güncelleme indirildi! Sessiz kurulum başlatılıyor...');
   } else if (ev.state === 'up-to-date') {
     dlBtn.classList.add('hidden');
     instBtn.classList.add('hidden');
@@ -1542,7 +1543,10 @@ $('btnOpenGithubRepo').onclick = () => {
   window.api.openExternal(OFFICIAL_GITHUB_URL);
 };
 
-$('btnBannerUpdate').onclick = () => navigateTo('updates');
+$('btnBannerUpdate').onclick = () => {
+  navigateTo('updates');
+  if (latestUpdateInfo) $('btnDownloadUpdate').click();
+};
 $('btnBannerDismiss').onclick = () => $('updateBanner').classList.remove('show');
 $('autoUpdateCheck').addEventListener('change', (e) => persist({ autoUpdateCheck: e.target.checked }));
 

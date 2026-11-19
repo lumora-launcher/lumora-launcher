@@ -16,7 +16,7 @@ const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
 const net = require('net');
-const { execFile } = require('child_process');
+const { execFile, spawn } = require('child_process');
 const AdmZip = require('adm-zip');
 const { Client, Authenticator } = require('minecraft-launcher-core');
 const { autoUpdater } = require('electron-updater');
@@ -1409,6 +1409,35 @@ function compareSemver(a, b) {
 }
 
 let directDownloadedInstallerPath = null;
+let updateInstallStarted = false;
+
+function runSilentUpdateInstall() {
+  if (updateInstallStarted) return { ok: true };
+  if (directDownloadedInstallerPath && fs.existsSync(directDownloadedInstallerPath)) {
+    updateInstallStarted = true;
+    isQuitting = true;
+    const installer = directDownloadedInstallerPath;
+    const exePath = process.execPath;
+    const script = `timeout /t 2 /nobreak >nul & "${installer}" /S & start "" "${exePath}"`;
+    const child = spawn('cmd.exe', ['/d', '/s', '/c', `"${script}"`], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+      windowsVerbatimArguments: true
+    });
+    child.unref();
+    setTimeout(() => app.quit(), 250);
+    return { ok: true };
+  }
+  if (app.isPackaged) {
+    updateInstallStarted = true;
+    isQuitting = true;
+    // isSilent=true, isForceRunAfter=true -> Kurulum sihirbazı açılmadan sessizce kur ve yeniden başlat
+    autoUpdater.quitAndInstall(true, true);
+    return { ok: true };
+  }
+  return { ok: false, error: 'Yalnızca kurulu (.exe) sürümde yeniden başlatıp kurabilirsin.' };
+}
 
 function cleanReleaseNotes(raw) {
   if (!raw || typeof raw !== 'string') return '';
@@ -1459,8 +1488,9 @@ function setupAutoUpdater() {
     send('update:event', {
       state: 'downloaded',
       version: info.version,
-      message: 'Güncelleme indirildi! Şimdi yeniden başlatıp kurabilirsin.'
+      message: 'Güncelleme indirildi! Kurulum sihirbazı açılmadan arka planda sessizce güncellenip yeniden başlatılıyor...'
     });
+    setTimeout(() => runSilentUpdateInstall(), 1200);
   });
 
   autoUpdater.on('error', () => {
@@ -1513,8 +1543,11 @@ async function downloadInstallerDirectly(exeUrl) {
   send('update:event', {
     state: 'downloaded',
     version: 'Yeni Sürüm',
-    message: 'Güncelleme paketi indirildi ve SHA-512 imzası doğrulandı! Şimdi yeniden başlatıp kurabilirsin.'
+    message: 'Güncelleme indirildi ve SHA-512 imzası doğrulandı! Arka planda sessizce güncellenip yeniden başlatılıyor...'
   });
+  if (app.isPackaged) {
+    setTimeout(() => runSilentUpdateInstall(), 1200);
+  }
   return dest;
 }
 
@@ -1630,20 +1663,7 @@ ipcMain.handle('update:download', async (_e, fallbackUrl) => {
   }
 });
 
-ipcMain.handle('update:install', () => {
-  if (directDownloadedInstallerPath && fs.existsSync(directDownloadedInstallerPath)) {
-    isQuitting = true;
-    shell.openPath(directDownloadedInstallerPath);
-    setTimeout(() => app.quit(), 600);
-    return { ok: true };
-  }
-  if (app.isPackaged) {
-    isQuitting = true;
-    autoUpdater.quitAndInstall();
-    return { ok: true };
-  }
-  return { ok: false, error: 'Yalnızca kurulu (.exe) sürümde yeniden başlatıp kurabilirsin.' };
-});
+ipcMain.handle('update:install', () => runSilentUpdateInstall());
 
 // ---------------- Sürümler & Mod Yükleyiciler (Fabric / Quilt / Forge) ----------------
 async function getManifest() {
