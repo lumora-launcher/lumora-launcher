@@ -1323,6 +1323,39 @@ $('showSnapshots').addEventListener('change', (e) => {
 });
 $('gameDir').addEventListener('change', (e) => persist({ gameDir: e.target.value.trim() }));
 $('jvmArgs').addEventListener('change', (e) => persist({ jvmArgs: e.target.value }));
+
+const JVM_PRESETS = {
+  aikar:
+    '-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions ' +
+    '-XX:+DisableExplicitGC -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M ' +
+    '-XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 ' +
+    '-XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 ' +
+    '-XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1',
+  lowend: '-XX:+UseG1GC -XX:MaxGCPauseMillis=50 -XX:+DisableExplicitGC -XX:+UseStringDeduplication'
+};
+document.querySelectorAll('#jvmPresets .chip').forEach((chip) => {
+  chip.onclick = () => {
+    const val = chip.dataset.jvm ? JVM_PRESETS[chip.dataset.jvm] : '';
+    $('jvmArgs').value = val;
+    persist({ jvmArgs: val });
+    toast(chip.dataset.jvm ? `JVM hazır ayarı uygulandı: ${chip.textContent.trim()}` : 'JVM argümanları temizlendi');
+  };
+});
+
+$('btnShareLogs').onclick = async () => {
+  const btn = $('btnShareLogs');
+  btn.disabled = true;
+  btn.textContent = '⏳ Yükleniyor...';
+  try {
+    const res = await window.api.shareLogs({ consoleText: $('console').textContent || '' });
+    if (!res.ok) return toast(res.error, true);
+    toast(`Log linki panoya kopyalandı: ${res.url}`);
+    log(`> Log paylaşıldı: ${res.url}`, 'info');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔗 Logu Paylaş (mclo.gs)';
+  }
+};
 $('btnPickDir').onclick = async () => {
   const dir = await window.api.pickFolder();
   if (dir) {

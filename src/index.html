@@ -644,6 +644,11 @@
             </div>
             <div class="field">
               <label>Ek JVM argümanları</label>
+              <div class="chips" id="jvmPresets" style="margin-bottom:8px">
+                <button class="chip" data-jvm="">Varsayılan (Boş)</button>
+                <button class="chip" data-jvm="aikar" title="Modlu oyunlarda takılmaları azaltan, topluluk tarafından en çok önerilen G1GC ayarları">⚡ Aikar's Flags (Önerilen)</button>
+                <button class="chip" data-jvm="lowend" title="Düşük RAM ve zayıf işlemcili bilgisayarlar için hafif ayarlar">🥔 Düşük Sistem</button>
+              </div>
               <input id="jvmArgs" placeholder="-XX:+UseG1GC -XX:+UnlockExperimentalVMOptions" spellcheck="false" />
             </div>
           </div>
@@ -741,6 +746,7 @@
           <h2 class="page-title">Konsol & Akıllı Çökme Analizi</h2>
           <div class="head-actions-row">
             <button class="ghost-btn accent-border" id="btnAnalyzeCrash" title="Son oyun loglarını ve crash-reports klasörünü tarayarak hatayı Türkçe açıkla">🔍 Akıllı Çökme & Log Analizi</button>
+            <button class="ghost-btn" id="btnShareLogs" title="Son oyun logunu mclo.gs'ye yükle ve linki panoya kopyala (erişim anahtarları otomatik gizlenir)">🔗 Logu Paylaş (mclo.gs)</button>
             <button class="ghost-btn" id="btnClearLog">Temizle</button>
           </div>
         </div>

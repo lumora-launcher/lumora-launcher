@@ -2,7 +2,15 @@
 //  Lumora Launcher - Ana süreç (Electron main process)
 //  Resmi GitHub: https://github.com/lumora-launcher/lumora-launcher
 // ============================================================
-const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, nativeImage, safeStorage, clipboard } = require('electron');
+
+// Loglarda erişim anahtarlarının (token) görünmesini engelle
+function redactSecrets(text) {
+  return String(text || '')
+    .replace(/(--accessToken\s+)\S+/gi, '$1[GİZLENDİ]')
+    .replace(/("?access_?token"?\s*[:=]\s*"?)[A-Za-z0-9._\-]{20,}/gi, '$1[GİZLENDİ]')
+    .replace(/eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}/g, '[GİZLENDİ]');
+}
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -202,7 +210,11 @@ function setupTray() {
 }
 
 // Saf Node.js Discord IPC (Rich Presence) İstemcisi
-const DISCORD_CLIENT_ID = '1214954349014515762'; // Genel Minecraft / Lumora RPC Uygulama Kimliği
+// Discord Developer Portal'da (https://discord.com/developers/applications) "Lumora Launcher"
+// adında bir uygulama oluşturup "Application ID" değerini buraya yapıştırın.
+// Rich Presence > Art Assets kısmına "minecraft" adında bir görsel yükleyin.
+// Boş bırakılırsa Discord entegrasyonu sessizce devre dışı kalır.
+const DISCORD_CLIENT_ID = '';
 let discordSocket = null;
 let discordReady = false;
 let lastDiscordState = null;
@@ -217,7 +229,7 @@ function encodeDiscordFrame(op, data) {
 }
 
 function connectDiscordRpc(pipeIndex = 0) {
-  if (discordSocket || pipeIndex > 9) return;
+  if (!DISCORD_CLIENT_ID || discordSocket || pipeIndex > 9) return;
   if (!loadSettings().discordRpc) return;
 
   const pipePath = `\\\\?\\pipe\\discord-ipc-${pipeIndex}`;
@@ -1475,12 +1487,29 @@ async function downloadInstallerDirectly(exeUrl) {
     });
   }
 
-  fs.writeFileSync(dest, Buffer.concat(chunks));
+  const fileBuf = Buffer.concat(chunks);
+
+  // Güvenlik: resmi Release'teki latest.yml içindeki SHA-512 ile doğrula
+  const ymlRes = await fetch(
+    `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/latest.yml`,
+    { headers: { 'User-Agent': USER_AGENT } }
+  );
+  if (!ymlRes.ok) {
+    throw new Error('Güncelleme doğrulama dosyası (latest.yml) bulunamadı, kurulum güvenlik nedeniyle iptal edildi.');
+  }
+  const ymlText = await ymlRes.text();
+  const shaMatch = ymlText.match(/^sha512:\s*(\S+)/m);
+  const actualSha = crypto.createHash('sha512').update(fileBuf).digest('base64');
+  if (!shaMatch || shaMatch[1] !== actualSha) {
+    throw new Error('İndirilen dosyanın SHA-512 imzası resmi sürümle eşleşmiyor! Kurulum güvenlik nedeniyle iptal edildi.');
+  }
+
+  fs.writeFileSync(dest, fileBuf);
   directDownloadedInstallerPath = dest;
   send('update:event', {
     state: 'downloaded',
     version: 'Yeni Sürüm',
-    message: 'Güncelleme paketi indirildi! Şimdi yeniden başlatıp kurabilirsin.'
+    message: 'Güncelleme paketi indirildi ve SHA-512 imzası doğrulandı! Şimdi yeniden başlatıp kurabilirsin.'
   });
   return dest;
 }
@@ -1955,10 +1984,35 @@ const MS_AUTH_URL =
   `&response_type=code&scope=${encodeURIComponent('service::user.auth.xboxlive.com::MBI_SSL')}` +
   `&redirect_uri=${encodeURIComponent(MS_REDIRECT_URI)}&prompt=select_account`;
 
+// Hesap anahtarları (token) Windows DPAPI (Electron safeStorage) ile şifrelenerek saklanır
+function encryptSecret(v) {
+  if (!v) return '';
+  try {
+    if (safeStorage.isEncryptionAvailable()) {
+      return 'enc:' + safeStorage.encryptString(String(v)).toString('base64');
+    }
+  } catch {}
+  return v;
+}
+
+function decryptSecret(v) {
+  if (typeof v !== 'string' || !v.startsWith('enc:')) return v || '';
+  try {
+    return safeStorage.decryptString(Buffer.from(v.slice(4), 'base64'));
+  } catch {
+    return '';
+  }
+}
+
 function loadAccounts() {
   try {
     const list = JSON.parse(fs.readFileSync(accountsFile(), 'utf8'));
-    return Array.isArray(list) ? list : [];
+    if (!Array.isArray(list)) return [];
+    return list.map((a) => ({
+      ...a,
+      accessToken: decryptSecret(a.accessToken),
+      refreshToken: decryptSecret(a.refreshToken)
+    }));
   } catch {
     return [];
   }
@@ -1966,7 +2020,12 @@ function loadAccounts() {
 
 function saveAccounts(list) {
   fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
-  fs.writeFileSync(accountsFile(), JSON.stringify(list, null, 2));
+  const safeList = list.map((a) => ({
+    ...a,
+    accessToken: encryptSecret(a.accessToken),
+    refreshToken: encryptSecret(a.refreshToken)
+  }));
+  fs.writeFileSync(accountsFile(), JSON.stringify(safeList, null, 2));
 }
 
 async function exchangeCodeOrRefreshForMcAccount(paramsObj) {
@@ -2647,12 +2706,12 @@ ipcMain.handle('game:launch', async (_e, s) => {
     });
 
     launcher.on('debug', (msg) => {
-      const str = String(msg);
+      const str = redactSecrets(msg);
       recentLogs += str + '\n';
       send('game:log', { level: 'debug', msg: str });
     });
     launcher.on('data', (msg) => {
-      const str = String(msg);
+      const str = redactSecrets(msg);
       recentLogs += str + '\n';
       if (recentLogs.length > 40000) recentLogs = recentLogs.slice(-30000);
       send('game:log', { level: 'game', msg: str });
@@ -2694,6 +2753,40 @@ ipcMain.handle('game:launch', async (_e, s) => {
   } catch (err) {
     gameRunning = false;
     send('game:state', 'closed');
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+// ---------------- Log Paylaşımı (mclo.gs) ----------------
+ipcMain.handle('logs:share', async (_e, { consoleText } = {}) => {
+  try {
+    const s = loadSettings();
+    const instances = loadInstances();
+    const activeInst = instances.find((x) => x.id === s.activeInstanceId) || instances[0];
+    const instanceDir = getInstanceDir(activeInst ? activeInst.id : 'default-vanilla', s.gameDir);
+    const latestLog = path.join(instanceDir, 'logs', 'latest.log');
+
+    let content = '';
+    if (fs.existsSync(latestLog)) content = fs.readFileSync(latestLog, 'utf8');
+    if (!content.trim()) content = String(consoleText || '');
+    if (!content.trim()) return { ok: false, error: 'Paylaşılacak log bulunamadı. Önce oyunu bir kez başlatın.' };
+
+    // mclo.gs sınırı: 25.000 satır / 10 MB -> son satırları gönder
+    const lines = redactSecrets(content).split(/\r?\n/);
+    const trimmed = lines.slice(-25000).join('\n').slice(-9 * 1024 * 1024);
+
+    const res = await fetch('https://api.mclo.gs/1/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': USER_AGENT },
+      body: new URLSearchParams({ content: trimmed }).toString()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success || !data.url) {
+      return { ok: false, error: data.error || `mclo.gs yükleme hatası (HTTP ${res.status})` };
+    }
+    clipboard.writeText(data.url);
+    return { ok: true, url: data.url };
+  } catch (err) {
     return { ok: false, error: err.message || String(err) };
   }
 });

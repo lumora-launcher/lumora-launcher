@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // Akıllı Çökme & Log Analizi
   analyzeInstanceCrash: (opts) => ipcRenderer.invoke('crash:analyzeInstance', opts),
+  shareLogs: (opts) => ipcRenderer.invoke('logs:share', opts),
 
   pickJava: () => ipcRenderer.invoke('dialog:java'),
   pickFolder: () => ipcRenderer.invoke('dialog:folder'),
