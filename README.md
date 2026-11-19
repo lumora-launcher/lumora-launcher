@@ -43,7 +43,23 @@ npm.cmd start
 npm.cmd run dist
 ```
 
-Kurulum dosyası (`Lumora-Launcher-Setup-1.2.1-beta.exe` ve `latest.yml`) `dist/` klasörüne oluşturulur.
+Kurulum dosyası (`Lumora-Launcher-Setup-1.2.1.exe` ve `latest.yml`) `dist/` klasörüne oluşturulur.
+
+Beta sürümü için:
+
+```powershell
+# Bağımlılıkları yükle
+npm.cmd install
+
+# Geliştirici modunda başlat
+npm.cmd start
+
+# Windows kurulum paketi (.exe) oluştur
+npm.cmd run dist:beta
+```
+
+Kurulum dosyası (`Lumora-Launcher-Setup-1.2.1-beta.exe` ve `latest.yml`) `dist/` klasörüne oluşturulur.(Beta için)
+
 
 ## ⚖️ Yasal Uyarı & Bağımsızlık Beyanı (Disclaimer)
 
