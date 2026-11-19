@@ -41,6 +41,7 @@ const LOADER_LABELS = {
   fabric: 'Fabric',
   quilt: 'Quilt',
   forge: 'Forge',
+  neoforge: 'NeoForge',
   optifine: 'OptiFine'
 };
 
@@ -49,6 +50,7 @@ const LOADER_ICONS = {
   fabric: '🧵',
   quilt: '🟪',
   forge: '⚒️',
+  neoforge: '🦊',
   optifine: '⚡'
 };
 
@@ -572,6 +574,12 @@ async function renderActiveInstanceDetails() {
     return;
   }
 
+  // Config & Ayarlar sekmesi
+  if (currentContentTab === 'configs') {
+    await renderConfigsTab(inst, listEl);
+    return;
+  }
+
   const items = await window.api.listInstanceContent({
     instanceId: inst.id,
     type: currentContentTab
@@ -888,6 +896,70 @@ async function renderScreenshotsTab(inst, container) {
   container.appendChild(grid);
 }
 
+// Config & Ayarlar Sekmesi
+let editingConfigState = null;
+
+async function renderConfigsTab(inst, container) {
+  const files = await window.api.listConfigs({ instanceId: inst.id });
+  if (!files || !files.length) {
+    container.innerHTML =
+      '<div class="empty-state">Bu profilde henüz <code>options.txt</code> veya <code>config/</code> ayar dosyası yok. Oyun bir kez başlatıldığında otomatik oluşur.</div>';
+    return;
+  }
+
+  for (const f of files) {
+    const row = document.createElement('div');
+    row.className = 'installed-item';
+    const sizeKb = Math.max(1, Math.round((f.size || 0) / 1024));
+    const dateStr = f.mtime ? new Date(f.mtime).toLocaleDateString('tr-TR') : '';
+    row.innerHTML = `
+      <div class="installed-left">
+        <div class="installed-icon">⚙️</div>
+        <div class="installed-info">
+          <strong></strong>
+          <span>${sizeKb} KB${dateStr ? ` · Güncelleme: ${dateStr}` : ''}</span>
+        </div>
+      </div>
+      <div class="installed-actions">
+        <button class="ghost-btn accent-border" data-edit-cfg>✏️ Düzenle</button>
+      </div>
+    `;
+    row.querySelector('strong').textContent = f.relPath;
+    row.querySelector('[data-edit-cfg]').onclick = async () => {
+      const res = await window.api.readConfigFile({ instanceId: inst.id, relPath: f.relPath });
+      if (!res.ok) return toast(res.error || 'Dosya okunamadı', true);
+      editingConfigState = { instanceId: inst.id, relPath: f.relPath };
+      $('configEditorTitle').textContent = `${inst.name} — ${f.relPath}`;
+      $('configEditorTextarea').value = res.content;
+      $('configEditorModal').classList.remove('hidden');
+      $('configEditorTextarea').focus();
+    };
+    container.appendChild(row);
+  }
+}
+
+$('btnConfigCancel').onclick = () => {
+  editingConfigState = null;
+  $('configEditorModal').classList.add('hidden');
+};
+
+$('btnConfigSave').onclick = async () => {
+  if (!editingConfigState) return;
+  const btn = $('btnConfigSave');
+  btn.disabled = true;
+  const res = await window.api.saveConfigFile({
+    instanceId: editingConfigState.instanceId,
+    relPath: editingConfigState.relPath,
+    content: $('configEditorTextarea').value
+  });
+  btn.disabled = false;
+  if (!res.ok) return toast(res.error || 'Dosya kaydedilemedi', true);
+  toast(`Kaydedildi: ${editingConfigState.relPath} ✓`);
+  editingConfigState = null;
+  $('configEditorModal').classList.add('hidden');
+  await renderActiveInstanceDetails();
+};
+
 $('btnPrepareBaseVersion').onclick = async () => {
   const inst = getActiveInstance();
   if (!inst) return;
@@ -904,7 +976,7 @@ $('btnPrepareBaseVersion').onclick = async () => {
 };
 
 $('btnOpenInstModrinth').onclick = () => {
-  currentModrinthType = currentContentTab;
+  currentModrinthType = ['mod', 'shader', 'resourcepack'].includes(currentContentTab) ? currentContentTab : 'mod';
   document.querySelectorAll('#modrinthTypeTabs .sub-tab').forEach((t) => {
     t.classList.toggle('active', t.dataset.mtype === currentModrinthType);
   });
@@ -1537,12 +1609,101 @@ const TASK_NAMES = {
   java: 'Java indiriliyor',
   'base-jar': 'Ana Minecraft sürümü (Vanilla) indiriliyor',
   optifine: 'OptiFine paketi indiriliyor ve kuruluyor',
+  neoforge: 'NeoForge paketi indiriliyor ve kuruluyor',
   mrpack: 'Modpack (.mrpack) içerikleri indiriliyor',
   assets: 'Oyun dosyaları indiriliyor',
   natives: 'Native dosyalar indiriliyor',
   classes: 'Kütüphaneler indiriliyor',
   'classes-custom': 'Mod yükleyici kütüphaneleri indiriliyor',
   'classes-maven-custom': 'Forge kütüphaneleri indiriliyor'
+};
+
+// ---------------- Skin & Karakter Stüdyosu ----------------
+let activeSkinPreviewName = 'Steve';
+
+function updateSkinStudioPreview(rawName) {
+  const clean = (String(rawName || '').trim() || 'Steve').replace(/[^A-Za-z0-9_]/g, '') || 'Steve';
+  activeSkinPreviewName = clean;
+  $('skinStudioPreviewLabel').textContent = clean;
+  $('skinFullBody').src = `https://mc-heads.net/body/${encodeURIComponent(clean)}/180`;
+  $('skinBustImg').src = `https://mc-heads.net/avatar/${encodeURIComponent(clean)}/64`;
+}
+
+function openSkinStudio() {
+  const curName =
+    settings.authMode === 'microsoft'
+      ? settings.username || 'Steve'
+      : $('username').value.trim() || settings.username || 'Steve';
+  $('skinSearchInput').value = curName;
+  updateSkinStudioPreview(curName);
+  $('skinStudioModal').classList.remove('hidden');
+}
+
+$('avatarCard').onclick = openSkinStudio;
+$('avatarCard').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    openSkinStudio();
+  }
+});
+
+$('btnSkinStudioClose').onclick = () => $('skinStudioModal').classList.add('hidden');
+$('skinStudioModal').addEventListener('click', (e) => {
+  if (e.target === $('skinStudioModal')) $('skinStudioModal').classList.add('hidden');
+});
+$('configEditorModal').addEventListener('click', (e) => {
+  if (e.target === $('configEditorModal')) {
+    editingConfigState = null;
+    $('configEditorModal').classList.add('hidden');
+  }
+});
+
+$('btnSkinPreview').onclick = () => updateSkinStudioPreview($('skinSearchInput').value);
+$('skinSearchInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') updateSkinStudioPreview($('skinSearchInput').value);
+});
+
+$('btnSkinUseName').onclick = async () => {
+  const name = ($('skinSearchInput').value.trim() || activeSkinPreviewName || 'Steve').slice(0, 16);
+  if (!USERNAME_RE.test(name)) {
+    return toast('Geçersiz kullanıcı adı (3-16 karakter, harf, rakam ve _)', true);
+  }
+  settings.authMode = 'offline';
+  settings.username = name;
+  $('username').value = name;
+  await window.api.selectAccount({ authMode: 'offline', accountId: settings.activeAccountId });
+  persist({ username: name, authMode: 'offline' });
+  await refreshAccountsUI();
+  $('skinStudioModal').classList.add('hidden');
+  toast(`Kullanıcı adı "${name}" olarak ayarlandı ✓`);
+};
+
+$('btnSkinDownloadPng').onclick = async () => {
+  const name = $('skinSearchInput').value.trim() || activeSkinPreviewName || 'Steve';
+  const res = await window.api.downloadSkinPng({ username: name });
+  if (res.canceled) return;
+  if (!res.ok) return toast(res.error || 'Skin indirilemedi', true);
+  toast(`Skin (.png) kaydedildi ✓`);
+};
+
+$('btnSkinUploadMs').onclick = async () => {
+  const btn = $('btnSkinUploadMs');
+  const variant = $('skinVariantSelect').value;
+  btn.disabled = true;
+  btn.querySelector('.play-label').textContent = '⏳ YÜKLENİYOR...';
+  try {
+    const res = await window.api.uploadMicrosoftSkin({ variant });
+    if (res.canceled) return;
+    if (!res.ok) return toast(res.error || 'Skin yüklenemedi', true);
+    toast(`${res.accountName} hesabına yeni skin başarıyla yüklendi! 🎉`);
+    if (res.accountName) {
+      updateSkinStudioPreview(res.accountName);
+      $('avatar').src = `https://mc-heads.net/avatar/${encodeURIComponent(res.accountName)}/128?t=${Date.now()}`;
+    }
+  } finally {
+    btn.disabled = false;
+    btn.querySelector('.play-label').textContent = '📤 Microsoft Hesabıma Skin (.png) Yükle';
+  }
 };
 
 // ---------------- Sunucu Listesi, Canlı Ping & QuickPlay ----------------

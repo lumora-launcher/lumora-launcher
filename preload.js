@@ -66,6 +66,15 @@ contextBridge.exposeInMainWorld('api', {
   deleteWorld: (opts) => ipcRenderer.invoke('worlds:delete', opts),
   listScreenshots: (opts) => ipcRenderer.invoke('screenshots:list', opts),
 
+  // Uygulama İçi Config & options.txt Düzenleyici
+  listConfigs: (opts) => ipcRenderer.invoke('config:list', opts),
+  readConfigFile: (opts) => ipcRenderer.invoke('config:read', opts),
+  saveConfigFile: (opts) => ipcRenderer.invoke('config:save', opts),
+
+  // Skin Stüdyosu (.png İndirme & Microsoft Hesabına Yükleme)
+  downloadSkinPng: (opts) => ipcRenderer.invoke('skin:downloadPng', opts),
+  uploadMicrosoftSkin: (opts) => ipcRenderer.invoke('skin:uploadMicrosoft', opts),
+
   // Sunucu Listesi & Canlı Ping
   listServers: () => ipcRenderer.invoke('servers:list'),
   addServer: (opts) => ipcRenderer.invoke('servers:add', opts),

@@ -136,7 +136,7 @@
             <h1>Maceraya <span class="gradient-text">hazır mısın?</span></h1>
             <p class="sub">İzole profilini seç, Modrinth'ten modlarını ekle ve tek tıkla oyuna gir.</p>
           </div>
-          <div class="avatar-wrap" id="avatarCard" title="Skin Önizleme">
+          <div class="avatar-wrap" id="avatarCard" title="Skin Stüdyosunu Aç — Tıkla" role="button" tabindex="0">
             <img id="avatar" src="https://mc-heads.net/avatar/Steve/128" alt="avatar" />
             <div class="avatar-ring"></div>
             <span class="avatar-tag" id="avatarTag">Steve</span>
@@ -276,6 +276,7 @@
               <label>Mod Yükleyici / İstemci (Loader)</label>
               <div class="loader-pills" id="newInstLoaderGroup">
                 <button type="button" class="loader-pill active" data-loader="fabric">Fabric</button>
+                <button type="button" class="loader-pill" data-loader="neoforge">NeoForge</button>
                 <button type="button" class="loader-pill" data-loader="optifine">OptiFine</button>
                 <button type="button" class="loader-pill" data-loader="forge">Forge</button>
                 <button type="button" class="loader-pill" data-loader="quilt">Quilt</button>
@@ -320,6 +321,7 @@
             <button class="sub-tab" data-ctype="resourcepack">🎨 Kaynak Paketleri</button>
             <button class="sub-tab" data-ctype="worlds">🌍 Dünyalar & Yedekler</button>
             <button class="sub-tab" data-ctype="screenshots">📸 Ekran Görüntüleri</button>
+            <button class="sub-tab" data-ctype="configs">⚙️ Config & Ayarlar</button>
           </div>
 
           <div class="installed-list" id="installedContentList"></div>
@@ -767,6 +769,75 @@
         <button class="ghost-btn accent-border hidden" id="btnCrashSearchMod">🔍 Eksik Modu Modrinth'te Ara</button>
         <button class="ghost-btn" id="btnCrashConsole">Konsolu Göster</button>
         <button class="play-btn sm-btn" id="btnCrashClose"><span class="play-label">TAMAM</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Config & Ayarlar Düzenleyici Modalı -->
+  <div class="modal-backdrop hidden" id="configEditorModal">
+    <div class="modal-card modal-wide glass">
+      <div class="modal-head">
+        <span class="badge">⚙️ Config & Ayar Düzenleyici</span>
+        <h3 id="configEditorTitle">options.txt</h3>
+      </div>
+      <textarea id="configEditorTextarea" class="config-textarea" spellcheck="false"></textarea>
+      <div class="modal-actions">
+        <button class="ghost-btn" id="btnConfigCancel">İptal</button>
+        <button class="play-btn sm-btn" id="btnConfigSave"><span class="play-label">💾 KAYDET</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Skin & Karakter Stüdyosu Modalı -->
+  <div class="modal-backdrop hidden" id="skinStudioModal">
+    <div class="modal-card modal-skin glass">
+      <div class="modal-head skin-modal-head">
+        <div>
+          <span class="badge">👕 Skin & Karakter Stüdyosu</span>
+          <h3>Tam Boy 3B Görünüm & Skin Yönetimi</h3>
+        </div>
+        <button class="icon-btn" id="btnSkinStudioClose" title="Kapat">✕</button>
+      </div>
+      <div class="skin-studio-grid">
+        <div class="skin-preview-col">
+          <div class="skin-stage">
+            <img id="skinFullBody" src="https://mc-heads.net/body/Steve/180" alt="Tam Boy Skin" />
+          </div>
+          <div class="skin-bust-row">
+            <img id="skinBustImg" src="https://mc-heads.net/avatar/Steve/64" alt="Kafa" />
+            <div>
+              <strong id="skinStudioPreviewLabel">Steve</strong>
+              <small class="hint">mc-heads.net canlı önizleme</small>
+            </div>
+          </div>
+        </div>
+        <div class="skin-controls-col">
+          <div class="field">
+            <label for="skinSearchInput">Oyuncu Adı Ara / Önizle</label>
+            <div class="inline">
+              <input id="skinSearchInput" maxlength="16" placeholder="Örn: Notch, Dream, Steve..." spellcheck="false" autocomplete="off" />
+              <button type="button" class="ghost-btn accent-border" id="btnSkinPreview">Önizle</button>
+            </div>
+          </div>
+          <button type="button" class="ghost-btn accent-border full" id="btnSkinUseName">✓ Bu İsmi Kullan</button>
+          <button type="button" class="ghost-btn full" id="btnSkinDownloadPng">⬇ Skin (.png) İndir</button>
+
+          <div class="skin-divider"></div>
+
+          <div class="field">
+            <label for="skinVariantSelect">Orijinal Microsoft Hesabına Skin Yükle</label>
+            <div class="select-wrap" style="margin-bottom:8px">
+              <select id="skinVariantSelect">
+                <option value="classic">Klasik (Steve) Modeli</option>
+                <option value="slim">İnce Kollar (Alex) Modeli</option>
+              </select>
+            </div>
+            <button type="button" class="play-btn sm-btn full" id="btnSkinUploadMs">
+              <span class="play-label">📤 Microsoft Hesabıma Skin (.png) Yükle</span>
+            </button>
+            <small class="hint">64×64 PNG formatındaki kendi skin dosyanı seçip doğrudan Microsoft profiline yükleyebilirsin.</small>
+          </div>
+        </div>
       </div>
     </div>
   </div>

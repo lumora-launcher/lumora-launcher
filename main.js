@@ -479,7 +479,7 @@ ipcMain.handle('instances:create', (_e, data) => {
     id,
     name: String(data.name || 'Yeni Profil').trim().slice(0, 40),
     mcVersion: String(data.mcVersion || '1.21.4'),
-    loader: ['vanilla', 'fabric', 'quilt', 'forge', 'optifine'].includes(data.loader) ? data.loader : 'vanilla',
+    loader: ['vanilla', 'fabric', 'quilt', 'forge', 'neoforge', 'optifine'].includes(data.loader) ? data.loader : 'vanilla',
     loaderVersion: String(data.loaderVersion || ''),
     icon: String(data.icon || 'grass'),
     ramMax: Number(data.ramMax) || 0,
@@ -944,9 +944,12 @@ async function installMrpackArchive(zipPathOrBuffer, customName) {
   } else if (deps['quilt-loader']) {
     loader = 'quilt';
     loaderVersion = deps['quilt-loader'];
-  } else if (deps.forge || deps.neoforge) {
+  } else if (deps.neoforge) {
+    loader = 'neoforge';
+    loaderVersion = deps.neoforge;
+  } else if (deps.forge) {
     loader = 'forge';
-    loaderVersion = deps.forge || deps.neoforge || '';
+    loaderVersion = deps.forge;
   }
 
   const packName = String(customName || index.name || 'Modpack Profili').trim().slice(0, 40);
@@ -1077,6 +1080,7 @@ ipcMain.handle('mrpack:exportInstance', async (_e, { instanceId }) => {
     const dependencies = { minecraft: inst.mcVersion };
     if (inst.loader === 'fabric') dependencies['fabric-loader'] = inst.loaderVersion || '0.16.10';
     else if (inst.loader === 'quilt') dependencies['quilt-loader'] = inst.loaderVersion || '0.26.0';
+    else if (inst.loader === 'neoforge') dependencies.neoforge = inst.loaderVersion || 'latest';
     else if (inst.loader === 'forge') dependencies.forge = inst.loaderVersion || 'latest';
 
     const indexJson = {
@@ -1725,6 +1729,79 @@ async function prepareForgeInstaller(mcVersion, gameDir) {
   return installerPath;
 }
 
+function getNeoForgePrefixForMc(mcVersion) {
+  const parts = String(mcVersion || '').split('.');
+  // 1.21.4 -> 21.4. | 1.21 -> 21.0. | 26.1 -> 26.1.
+  if (parts[0] === '1' && parts.length >= 2) {
+    const minor = parts[1];
+    const patch = parts[2] || '0';
+    return `${minor}.${patch}.`;
+  }
+  return `${parts[0]}.${parts[1] || '0'}.`;
+}
+
+async function prepareNeoForgeProfile(mcVersion, gameDir, javaExe, preferredLoaderVer = '') {
+  await ensureBaseVanillaVersion(mcVersion, gameDir);
+
+  let chosenVer = preferredLoaderVer && preferredLoaderVer !== 'latest' ? preferredLoaderVer : '';
+  if (!chosenVer) {
+    const verRes = await fetch('https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge', {
+      headers: { 'User-Agent': USER_AGENT }
+    });
+    if (!verRes.ok) throw new Error('NeoForge sürüm listesi alınamadı.');
+    const verData = await verRes.json();
+    const prefix = getNeoForgePrefixForMc(mcVersion);
+    const matches = (verData.versions || []).filter((v) => String(v).startsWith(prefix));
+    if (!matches.length) {
+      throw new Error(`Minecraft ${mcVersion} için uygun bir NeoForge sürümü bulunamadı.`);
+    }
+    const stable = matches.filter((v) => !/alpha|beta/i.test(v));
+    chosenVer = stable.length ? stable[stable.length - 1] : matches[matches.length - 1];
+  }
+
+  const customId = `neoforge-${chosenVer}`;
+  const customJsonPath = path.join(gameDir, 'versions', customId, `${customId}.json`);
+  if (fs.existsSync(customJsonPath)) {
+    return customId;
+  }
+
+  const installerDir = path.join(gameDir, 'forge-installers');
+  const installerPath = path.join(installerDir, `neoforge-${chosenVer}-installer.jar`);
+  if (!fs.existsSync(installerPath)) {
+    send('game:log', { level: 'debug', msg: `[Lumora]: NeoForge ${chosenVer} installer indiriliyor...` });
+    send('game:progress', { type: 'neoforge', task: 0, total: 1 });
+    const url = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${encodeURIComponent(chosenVer)}/neoforge-${encodeURIComponent(chosenVer)}-installer.jar`;
+    await downloadFileTo(url, installerPath);
+    send('game:progress', { type: 'neoforge', task: 1, total: 1 });
+  }
+
+  const lpFile = path.join(gameDir, 'launcher_profiles.json');
+  if (!fs.existsSync(lpFile)) {
+    fs.writeFileSync(lpFile, JSON.stringify({ profiles: {} }, null, 2));
+  }
+
+  send('game:log', { level: 'debug', msg: `[Lumora]: NeoForge ${chosenVer} sessiz olarak kuruluyor...` });
+  const runJava = (javaExe || 'java').replace(/javaw\.exe$/i, 'java.exe');
+  await new Promise((resolve, reject) => {
+    execFile(
+      runJava,
+      ['-jar', installerPath, '--installClient', gameDir],
+      { timeout: 120000, windowsHide: true },
+      (err, stdout, stderr) => {
+        if (err) {
+          return reject(new Error(`NeoForge kurulum hatası: ${stderr || stdout || err.message}`));
+        }
+        resolve();
+      }
+    );
+  });
+
+  if (!fs.existsSync(customJsonPath)) {
+    throw new Error(`NeoForge profili oluşturulamadı (${customId}).`);
+  }
+  return customId;
+}
+
 // Ana (Vanilla) sürüm dosyalarını denetle ve eksikse indir (Fabric/Forge/OptiFine ön koşulu)
 async function ensureBaseVanillaVersion(mcVersion, gameDir) {
   const vDir = path.join(gameDir, 'versions', mcVersion);
@@ -2283,6 +2360,7 @@ function inspectExternalInstanceDir(dir, sourceName, fallbackName) {
         const ml = JSON.stringify(cf.baseModLoader || {}).toLowerCase();
         if (ml.includes('fabric')) loader = 'fabric';
         else if (ml.includes('quilt')) loader = 'quilt';
+        else if (ml.includes('neoforge')) loader = 'neoforge';
         else if (ml.includes('forge')) loader = 'forge';
       } catch {}
     }
@@ -2300,6 +2378,7 @@ function inspectExternalInstanceDir(dir, sourceName, fallbackName) {
           if (comp.uid === 'net.minecraft' && comp.version) mcVersion = comp.version;
           if (comp.uid === 'net.fabricmc.fabric-loader') loader = 'fabric';
           if (comp.uid === 'org.quiltmc.quilt-loader') loader = 'quilt';
+          if (comp.uid === 'net.neoforged') loader = 'neoforge';
           if (comp.uid === 'net.minecraftforge') loader = 'forge';
         }
         const cfgPath = path.join(mmcRoot, 'instance.cfg');
@@ -2320,6 +2399,7 @@ function inspectExternalInstanceDir(dir, sourceName, fallbackName) {
         if (rel) mcVersion = rel;
         if (vers.some((v) => /fabric/i.test(v))) loader = 'fabric';
         else if (vers.some((v) => /optifine/i.test(v))) loader = 'optifine';
+        else if (vers.some((v) => /neoforge/i.test(v))) loader = 'neoforge';
         else if (vers.some((v) => /forge/i.test(v))) loader = 'forge';
       } catch {}
     }
@@ -2658,6 +2738,13 @@ ipcMain.handle('game:launch', async (_e, s) => {
       );
     } else if (loader === 'optifine') {
       versionConfig.custom = await prepareOptiFineProfile(mcVersion, mergedSettings.gameDir, javaExe);
+    } else if (loader === 'neoforge') {
+      versionConfig.custom = await prepareNeoForgeProfile(
+        mcVersion,
+        mergedSettings.gameDir,
+        javaExe,
+        activeInst ? activeInst.loaderVersion : ''
+      );
     } else if (loader === 'forge') {
       forgeInstallerPath = await prepareForgeInstaller(mcVersion, mergedSettings.gameDir);
     }
@@ -2786,6 +2873,179 @@ ipcMain.handle('logs:share', async (_e, { consoleText } = {}) => {
     }
     clipboard.writeText(data.url);
     return { ok: true, url: data.url };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+// ---------------- Uygulama İçi Config & options.txt Düzenleyici ----------------
+const CONFIG_EXT_RE = /\.(json|toml|properties|cfg|yml|yaml|txt|ini)$/i;
+
+function resolveSafeInstancePath(instDir, relPath) {
+  const root = path.resolve(instDir);
+  const fullPath = path.resolve(root, String(relPath || ''));
+  if (!fullPath.startsWith(root + path.sep)) {
+    throw new Error('Geçersiz veya izin verilmeyen dosya yolu.');
+  }
+  return fullPath;
+}
+
+ipcMain.handle('config:list', (_e, { instanceId }) => {
+  const instDir = getInstanceDir(instanceId);
+  const files = [];
+
+  for (const rootFile of ['options.txt', 'optionsof.txt']) {
+    const p = path.join(instDir, rootFile);
+    if (fs.existsSync(p)) {
+      try {
+        const st = fs.statSync(p);
+        if (st.isFile()) {
+          files.push({
+            relPath: rootFile,
+            name: rootFile,
+            size: st.size,
+            mtime: st.mtimeMs
+          });
+        }
+      } catch {}
+    }
+  }
+
+  const configDir = path.join(instDir, 'config');
+  if (fs.existsSync(configDir)) {
+    const walk = (dir, depth) => {
+      if (depth > 2) return;
+      let entries = [];
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const e of entries) {
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) {
+          walk(full, depth + 1);
+        } else if (e.isFile() && CONFIG_EXT_RE.test(e.name)) {
+          try {
+            const st = fs.statSync(full);
+            const relPath = path.relative(instDir, full).replace(/\\/g, '/');
+            files.push({
+              relPath,
+              name: e.name,
+              size: st.size,
+              mtime: st.mtimeMs
+            });
+          } catch {}
+        }
+      }
+    };
+    walk(configDir, 0);
+  }
+
+  files.sort((a, b) => a.relPath.localeCompare(b.relPath));
+  return files;
+});
+
+ipcMain.handle('config:read', (_e, { instanceId, relPath }) => {
+  try {
+    const instDir = getInstanceDir(instanceId);
+    const fullPath = resolveSafeInstancePath(instDir, relPath);
+    if (!fs.existsSync(fullPath)) {
+      return { ok: false, error: 'Dosya bulunamadı.' };
+    }
+    const st = fs.statSync(fullPath);
+    if (!st.isFile()) {
+      return { ok: false, error: 'Seçilen yol bir dosya değil.' };
+    }
+    if (st.size > 512 * 1024) {
+      return { ok: false, error: 'Dosya çok büyük (maksimum 512 KB düzenlenebilir).' };
+    }
+    const content = fs.readFileSync(fullPath, 'utf8');
+    return { ok: true, content };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+ipcMain.handle('config:save', (_e, { instanceId, relPath, content }) => {
+  try {
+    const instDir = getInstanceDir(instanceId);
+    const fullPath = resolveSafeInstancePath(instDir, relPath);
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(fullPath, String(content ?? ''), 'utf8');
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+// ---------------- Skin Stüdyosu (PNG İndirme & Microsoft Hesabına Yükleme) ----------------
+ipcMain.handle('skin:downloadPng', async (_e, { username } = {}) => {
+  const cleanName = String(username || 'Steve').trim() || 'Steve';
+  const saveRes = await dialog.showSaveDialog(win, {
+    title: 'Skin (.png) Kaydet',
+    defaultPath: `${cleanName.replace(/[^a-zA-Z0-9_-]/g, '_')}-skin.png`,
+    filters: [{ name: 'PNG Görseli', extensions: ['png'] }]
+  });
+  if (saveRes.canceled || !saveRes.filePath) return { ok: false, canceled: true };
+
+  try {
+    const res = await fetch(`https://mc-heads.net/download/${encodeURIComponent(cleanName)}`, {
+      headers: { 'User-Agent': USER_AGENT }
+    });
+    if (!res.ok) throw new Error(`Skin indirilemedi (HTTP ${res.status})`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    fs.writeFileSync(saveRes.filePath, buf);
+    return { ok: true, filePath: saveRes.filePath };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+ipcMain.handle('skin:uploadMicrosoft', async (_e, { variant } = {}) => {
+  try {
+    const s = loadSettings();
+    const accounts = loadAccounts();
+    let acc = accounts.find((x) => x.id === s.activeAccountId) || accounts[0];
+    if (!acc) {
+      return {
+        ok: false,
+        error: 'Skin yüklemek için önce bir Microsoft (Orijinal) hesabı ile giriş yapmalısınız.'
+      };
+    }
+
+    const pickRes = await dialog.showOpenDialog(win, {
+      title: 'Yüklenecek Skin (.png) Dosyasını Seç',
+      filters: [{ name: 'Minecraft Skin (64x64 PNG)', extensions: ['png'] }],
+      properties: ['openFile']
+    });
+    if (pickRes.canceled || !pickRes.filePaths[0]) return { ok: false, canceled: true };
+
+    if (Date.now() > (acc.expiresAt || 0) && acc.refreshToken) {
+      acc = await exchangeCodeOrRefreshForMcAccount({
+        grant_type: 'refresh_token',
+        refresh_token: acc.refreshToken
+      });
+      saveAccounts(accounts.map((x) => (x.id === acc.id ? acc : x)));
+    }
+
+    const fileBuf = fs.readFileSync(pickRes.filePaths[0]);
+    const form = new FormData();
+    form.append('variant', variant === 'slim' ? 'slim' : 'classic');
+    form.append('file', new Blob([fileBuf], { type: 'image/png' }), 'skin.png');
+
+    const uploadRes = await fetch('https://api.minecraftservices.com/minecraft/profile/skins', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${acc.accessToken}`
+      },
+      body: form
+    });
+    if (!uploadRes.ok) {
+      const errText = await uploadRes.text().catch(() => '');
+      throw new Error(`Skin yüklenemedi (HTTP ${uploadRes.status})${errText ? ': ' + errText.slice(0, 120) : ''}`);
+    }
+    return { ok: true, accountName: acc.name };
   } catch (err) {
     return { ok: false, error: err.message || String(err) };
   }

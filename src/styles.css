@@ -388,6 +388,7 @@ html[data-animations="off"] *::after {
 .avatar-wrap {
   position: relative; width: 136px; height: 136px;
   display: grid; place-items: center; margin-right: 20px;
+  cursor: pointer;
   transition: transform .3s cubic-bezier(.22, 1, .36, 1);
 }
 .avatar-wrap:hover { transform: translateY(-5px) rotate(2deg) scale(1.04); }
@@ -1028,6 +1029,57 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .account-mode-pill.ms-active {
   background: rgba(32,214,168,0.18); border-color: var(--accent-2); color: var(--accent-2);
+}
+
+/* ---------- Config Düzenleyici & Skin Stüdyosu Modalları ---------- */
+.modal-card.modal-wide {
+  width: 740px; max-width: 94vw; border-color: var(--panel-border);
+}
+.config-textarea {
+  width: 100%; height: 380px; resize: vertical;
+  padding: 14px; border-radius: 12px;
+  background: rgba(8, 10, 18, 0.85); color: #d6e4ff;
+  border: 1px solid var(--panel-border);
+  font-family: "Cascadia Code", Consolas, monospace; font-size: 12.5px; line-height: 1.5;
+  outline: none;
+}
+.config-textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+.modal-card.modal-skin {
+  width: 700px; max-width: 94vw; border-color: var(--panel-border);
+}
+.skin-modal-head {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+}
+.skin-studio-grid {
+  display: grid; grid-template-columns: 240px 1fr; gap: 22px; align-items: start;
+}
+.skin-preview-col {
+  display: flex; flex-direction: column; gap: 12px;
+}
+.skin-stage {
+  height: 270px; border-radius: 16px;
+  background: radial-gradient(circle at 50% 35%, rgba(124, 92, 255, 0.16), rgba(8, 10, 18, 0.7));
+  border: 1px solid var(--panel-border);
+  display: grid; place-items: center; padding: 14px;
+}
+.skin-stage img {
+  max-height: 230px; image-rendering: pixelated;
+  filter: drop-shadow(0 14px 24px rgba(0, 0, 0, 0.65));
+}
+.skin-bust-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border-radius: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--panel-border);
+}
+.skin-bust-row img {
+  width: 38px; height: 38px; border-radius: 8px; image-rendering: pixelated;
+}
+.skin-bust-row strong { display: block; font-size: 13.5px; }
+.skin-controls-col {
+  display: flex; flex-direction: column; gap: 12px;
+}
+.skin-divider {
+  height: 1px; background: var(--panel-border); margin: 4px 0;
 }
 
 /* ---------- Toast ---------- */
