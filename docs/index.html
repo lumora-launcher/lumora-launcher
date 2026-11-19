@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lumora Launcher — Modern Open-Source Minecraft Launcher</title>
+  <meta name="description" content="Modern, fast, and 100% open-source Minecraft Launcher for Windows with isolated instances, built-in Modrinth Store, NeoForge/Fabric/Forge/OptiFine support, Pre-Launch Mod Doctor, and 3D Skin Studio." />
+  <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/lumora-launcher/lumora-launcher/main/assets/icon.png" />
+  <style>
+    :root {
+      --bg: #070b14;
+      --bg2: #0d1324;
+      --card: rgba(16, 23, 44, 0.72);
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #eef2ff;
+      --muted: #94a3b8;
+      --accent: #7c5cff;
+      --accent2: #20d6a8;
+      --amber: #ff9f1c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background:
+        radial-gradient(900px 520px at 15% -5%, rgba(124, 92, 255, 0.24), transparent 60%),
+        radial-gradient(800px 500px at 90% 10%, rgba(32, 214, 168, 0.18), transparent 60%),
+        linear-gradient(180deg, var(--bg), var(--bg2));
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    .container { width: min(1140px, 92vw); margin: 0 auto; }
+
+    header {
+      position: sticky; top: 0; z-index: 40;
+      backdrop-filter: blur(14px);
+      background: rgba(7, 11, 20, 0.72);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 0; gap: 16px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 18px; }
+    .brand img { width: 34px; height: 34px; border-radius: 10px; }
+    .nav-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .pill-btn {
+      padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+      border: 1px solid var(--border); background: rgba(255, 255, 255, 0.04);
+      color: var(--text); cursor: pointer; transition: all 0.2s;
+    }
+    .pill-btn:hover { border-color: var(--accent); background: rgba(124, 92, 255, 0.16); }
+
+    .hero {
+      padding: 72px 0 46px;
+      text-align: center;
+      display: flex; flex-direction: column; align-items: center; gap: 20px;
+    }
+    .ver-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 14px; border-radius: 99px; font-size: 12.5px; font-weight: 700;
+      background: rgba(32, 214, 168, 0.12); color: var(--accent2);
+      border: 1px solid rgba(32, 214, 168, 0.35);
+    }
+    .hero h1 {
+      font-size: clamp(34px, 5vw, 56px);
+      font-weight: 900; letter-spacing: -1px; line-height: 1.1;
+      max-width: 820px;
+    }
+    .grad {
+      background: linear-gradient(120deg, #a78bfa, #20d6a8);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero p { max-width: 680px; color: var(--muted); font-size: 17px; }
+
+    .dl-row {
+      display: flex; align-items: center; justify-content: center;
+      gap: 14px; flex-wrap: wrap; margin-top: 8px;
+    }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 15px 28px; border-radius: 14px; font-weight: 800; font-size: 15px;
+      background: linear-gradient(135deg, var(--accent), #4f46e5 55%, var(--accent2));
+      color: #fff; box-shadow: 0 14px 36px rgba(124, 92, 255, 0.42);
+      transition: transform 0.18s, box-shadow 0.18s;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 18px 44px rgba(124, 92, 255, 0.55); }
+    .btn-beta {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 14px 22px; border-radius: 14px; font-weight: 700; font-size: 14px;
+      border: 1px solid rgba(255, 159, 28, 0.45);
+      background: rgba(255, 159, 28, 0.12); color: #ffd166;
+      transition: all 0.18s;
+    }
+    .btn-beta:hover { background: rgba(255, 159, 28, 0.22); transform: translateY(-1px); }
+    .meta-note { font-size: 12.5px; color: var(--muted); }
+
+    .hero-shot {
+      margin-top: 28px;
+      border-radius: 20px; overflow: hidden;
+      border: 1px solid rgba(139, 124, 255, 0.35);
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.65);
+      background: #0b1020;
+    }
+    .hero-shot img { display: block; width: 100%; height: auto; }
+
+    .section { padding: 54px 0; }
+    .sec-title { text-align: center; font-size: 28px; font-weight: 800; margin-bottom: 10px; }
+    .sec-sub { text-align: center; color: var(--muted); margin-bottom: 34px; font-size: 15px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      padding: 22px; border-radius: 16px;
+      background: var(--card); border: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+    .card .ico { font-size: 26px; margin-bottom: 10px; display: block; }
+    .card h3 { font-size: 16.5px; margin-bottom: 6px; }
+    .card p { font-size: 13.5px; color: var(--muted); }
+
+    .shots-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 18px;
+    }
+    .shot-card {
+      border-radius: 16px; overflow: hidden;
+      background: var(--card); border: 1px solid var(--border);
+    }
+    .shot-card img { width: 100%; display: block; }
+    .shot-card div { padding: 12px 16px; font-size: 13.5px; font-weight: 700; }
+
+    footer {
+      margin-top: 40px; padding: 28px 0 42px;
+      border-top: 1px solid var(--border);
+      text-align: center; color: var(--muted); font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container nav">
+      <div class="brand">
+        <img src="https://raw.githubusercontent.com/lumora-launcher/lumora-launcher/main/assets/icon.png" alt="Lumora" />
+        <span>Lumora Launcher</span>
+      </div>
+      <div class="nav-actions">
+        <button class="pill-btn" id="btnLangToggle">🇹🇷 Türkçe / 🇬🇧 English</button>
+        <a class="pill-btn" href="https://github.com/lumora-launcher/lumora-launcher" target="_blank" rel="noopener">GitHub ↗</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div class="ver-chip" id="heroVerChip">✨ Stable v1.3.0 · Windows x64 · Open Source</div>
+      <h1 id="heroHeading">Modern, Fast & Open-Source <span class="grad">Minecraft Launcher</span></h1>
+      <p id="heroSub">
+        Isolated instances, built-in Modrinth Store, NeoForge/Fabric/Forge/OptiFine loaders, Pre-Launch Mod Doctor, 3D Skin Studio, Drag & Drop installs, and 7 languages in one lightweight app.
+      </p>
+
+      <div class="dl-row">
+        <a class="btn-primary" id="btnDlStable" href="https://github.com/lumora-launcher/lumora-launcher/releases/latest" target="_blank" rel="noopener">
+          <span id="lblDlStable">⬇ Download Stable (.exe)</span>
+        </a>
+        <a class="btn-beta" id="btnDlBeta" href="https://github.com/lumora-launcher/lumora-launcher/releases" target="_blank" rel="noopener">
+          <span id="lblDlBeta">🧪 Download Beta Preview</span>
+        </a>
+      </div>
+      <div class="meta-note" id="metaNote">100% Open Source (MIT License) · Windows 10 / 11 (x64) · Verified via GitHub Releases</div>
+
+      <div class="hero-shot">
+        <img id="heroPreviewImg" src="https://raw.githubusercontent.com/lumora-launcher/lumora-launcher/main/assets/screenshots/hero-en.png" alt="Lumora Launcher UI" />
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="sec-title" id="featTitle">Everything You Need Out of the Box</h2>
+      <p class="sec-sub" id="featSub">Built cleanly with Electron & native performance — no ads, no bloatware.</p>
+      <div class="grid" id="featGrid"></div>
+    </section>
+
+    <section class="section">
+      <h2 class="sec-title" id="galTitle">Interface Showcase</h2>
+      <p class="sec-sub" id="galSub">5 color themes, 3 layouts, Modrinth catalog, and 3D Canvas Skin Studio.</p>
+      <div class="shots-grid" id="shotsGrid"></div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p id="footerDisclaimer">
+        Lumora Launcher is an independent open-source project under the MIT License. Not an official Minecraft product and not approved by or associated with Mojang AB or Microsoft Corporation.
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    const COPY = {
+      en: {
+        verChip: '✨ Stable Ready · Windows x64 · MIT Open Source',
+        heading: 'Modern, Fast & Open-Source <span class="grad">Minecraft Launcher</span>',
+        sub: 'Isolated instances, built-in Modrinth Store, NeoForge/Fabric/Forge/OptiFine loaders, Pre-Launch Mod Doctor, 3D Skin Studio, Drag & Drop installs, and 7 languages.',
+        dlStable: '⬇ Download Stable Installer',
+        dlBeta: '🧪 Latest Beta Preview',
+        meta: '100% Open Source (MIT License) · Windows 10 / 11 (x64) · Direct GitHub Release',
+        featTitle: 'Everything You Need Out of the Box',
+        featSub: 'No ads, no telemetry, clean DPAPI security, and automatic Java resolution.',
+        galTitle: 'Interface Showcase',
+        galSub: 'Explore isolated instances, Modrinth store, server ping monitor, and 3D skin preview.',
+        disclaimer: 'Lumora Launcher is an independent open-source project under the MIT License. Not an official Minecraft product and not approved by or associated with Mojang AB or Microsoft.',
+        features: [
+          ['🗂️', 'Isolated Profiles & Duplication', 'Fabric, NeoForge, Forge, OptiFine, Quilt, and Vanilla each keep separate mods, saves, shaderpacks, and config folders with per-profile RAM limits.'],
+          ['🩺', 'Pre-Launch Mod & Dependency Doctor', 'Inspects mod JAR metadata before launching to warn about missing libraries like Fabric API or Cloth Config before the game crashes.'],
+          ['🟢', 'Integrated Modrinth & .mrpack', 'Search and install mods, shaders, resource packs, and full .mrpack modpacks with automatic dependency resolution and SHA-1 update checks.'],
+          ['📦', 'Universal Drag & Drop Installer', 'Drop .jar mods, .zip shaders/resource packs, or .mrpack archives anywhere on the launcher window to install automatically.'],
+          ['👕', '3D Canvas Skin Studio (Steve & Alex)', 'Supports 3px slim (Alex) & 4px classic (Steve) arms, legacy 64x32 skin fixes, custom .png selection, and direct Microsoft upload.'],
+          ['⌨️', 'Ctrl+K Command Palette & F2 Copy', 'Press Ctrl+K anywhere to switch profiles, change themes, search Modrinth, or copy F2 screenshots straight to Discord.']
+        ],
+        shots: [
+          ['https://raw.githubusercontent.com/lumora-launcher/lumora-launcher/main/assets/screenshots/feature-instances.png', 'Isolated Profiles & Edit Controls'],
+          ['https://raw.githubusercontent.com/lumora-launcher/lumora-launcher/main/assets/screenshots/feature-modrinth.png', 'Modrinth Store & Auto-Dependencies'],
+          ['https://raw.githubusercontent.com/lumora-launcher/lumora-launcher/main/assets/screenshots/feature-servers.png', 'Live Server Ping & 1-Click QuickPlay'],
+          ['https://raw.githubusercontent.com/lumora-launcher/lumora-launcher/main/assets/screenshots/feature-skin-studio.png', '3D Canvas Skin Studio (Steve & Alex)']
+        ]
+      },
+      tr: {
+        verChip: '✨ Tam Sürüm Hazır · Windows x64 · MIT Açık Kaynak',
+        heading: 'Modern, Hızlı & Açık Kaynaklı <span class="grad">Minecraft Launcher</span>',
+        sub: 'İzole profiller, dahili Modrinth mağazası, NeoForge/Fabric/Forge/OptiFine desteği, Oyun Öncesi Mod Doktoru, 3B Skin Stüdyosu, sürükle-bırak kurulum ve 7 dil desteği tek pencerede.',
+        dlStable: '⬇ Tam Sürümü İndir (.exe)',
+        dlBeta: '🧪 Son Beta Önizlemeyi İndir',
+        meta: '%100 Açık Kaynak (MIT Lisansı) · Windows 10 / 11 (x64) · Resmi GitHub İndirmesi',
+        featTitle: 'İhtiyacın Olan Her Şey Dahili',
+        featSub: 'Reklamsız, şeffaf kaynak kodlu, Windows DPAPI oturum güvenliği ve otomatik Java kurulumu.',
+        galTitle: 'Arayüz Görüntüleri',
+        galSub: 'İzole profiller, Modrinth mağazası, canlı sunucu listesi ve dahili 3B Skin Stüdyosu.',
+        disclaimer: 'Lumora Launcher, MIT Lisansı altında geliştirilen tamamen özgün ve açık kaynaklı bir projedir. Resmi bir Minecraft ürünü değildir; Mojang AB veya Microsoft Corporation ile bağlantısı yoktur.',
+        features: [
+          ['🗂️', 'İzole Profiller & Tek Tıkla Çoğaltma', 'Fabric, NeoForge, Forge, OptiFine, Quilt ve Vanilla profillerini ayrı mods, saves ve config klasörlerinde özel RAM ve simgeyle sakla.'],
+          ['🩺', 'Oyun Öncesi Mod Doktoru', 'Oyunu açmadan önce modların .jar dosyalarını tarar; eksik Fabric API / Cloth Config gibi kütüphaneleri çökme olmadan uyarır.'],
+          ['🟢', 'Dahili Modrinth & .mrpack Mağazası', 'Tarayıcıya gerek kalmadan mod, shader, kaynak paketi ve modpack indir; bağımlılıkları ve güncellemeleri tek tıkla kur.'],
+          ['📦', 'Sürükle-Bırak Akıllı Kurulum', 'Pencereye .jar mod, .zip shader/kaynak paketi veya .mrpack sürükleyip bırak; içeriği analiz edip doğru klasöre otomatik kursun.'],
+          ['👕', 'Dahili 3B Skin Stüdyosu (Steve & Alex)', 'Otomatik 3px ince kol (Alex) ve 4px klasik kol (Steve) algılama, bilgisayardan PNG seçme ve Microsoft hesabına yükleme.'],
+          ['⌨️', 'Ctrl+K Komut Paleti & F2 Kopyalama', 'Her yerden Ctrl+K ile hızlı profil değiştir, Modrinth\'te ara veya F2 ekran görüntülerini tek tıkla Discord\'a kopyala.']
+        ],
+        shots: [
+          ['https://raw.githubusercontent.com/lumora-launcher/lumora-launcher/main/assets/screenshots/feature-instances.png', 'İzole Profiller & Düzenleme'],
+          ['https://raw.githubusercontent.com/lumora-launcher/lumora-launcher/main/assets/screenshots/feature-modrinth.png', 'Modrinth İçerik Mağazası'],
+          ['https://raw.githubusercontent.com/lumora-launcher/lumora-launcher/main/assets/screenshots/feature-servers.png', 'Canlı Sunucu Ping & Tek Tıkla Bağlan'],
+          ['https://raw.githubusercontent.com/lumora-launcher/lumora-launcher/main/assets/screenshots/feature-skin-studio.png', 'Dahili 3B Canvas Skin Stüdyosu']
+        ]
+      }
+    };
+
+    let curLang = (navigator.language || '').toLowerCase().startsWith('tr') ? 'tr' : 'en';
+    let stableVer = '';
+    let betaVer = '';
+
+    function render() {
+      const c = COPY[curLang];
+      document.documentElement.lang = curLang;
+      document.getElementById('heroVerChip').textContent = stableVer
+        ? (curLang === 'tr' ? `✨ Tam Sürüm ${stableVer} · Windows x64 · MIT Açık Kaynak` : `✨ Stable ${stableVer} · Windows x64 · MIT Open Source`)
+        : c.verChip;
+      document.getElementById('heroHeading').innerHTML = c.heading;
+      document.getElementById('heroSub').textContent = c.sub;
+      document.getElementById('lblDlStable').textContent = stableVer ? `${c.dlStable} (${stableVer})` : c.dlStable;
+      document.getElementById('lblDlBeta').textContent = betaVer ? `${c.dlBeta} (${betaVer})` : c.dlBeta;
+      document.getElementById('metaNote').textContent = c.meta;
+      document.getElementById('featTitle').textContent = c.featTitle;
+      document.getElementById('featSub').textContent = c.featSub;
+      document.getElementById('galTitle').textContent = c.galTitle;
+      document.getElementById('galSub').textContent = c.galSub;
+      document.getElementById('footerDisclaimer').textContent = c.disclaimer;
+
+      document.getElementById('featGrid').innerHTML = c.features
+        .map(([ico, t, d]) => `<div class="card"><span class="ico">${ico}</span><h3>${t}</h3><p>${d}</p></div>`)
+        .join('');
+
+      document.getElementById('shotsGrid').innerHTML = c.shots
+        .map(([src, cap]) => `<div class="shot-card"><img src="${src}" alt="${cap}" loading="lazy" /><div>${cap}</div></div>`)
+        .join('');
+    }
+
+    document.getElementById('btnLangToggle').onclick = () => {
+      curLang = curLang === 'en' ? 'tr' : 'en';
+      render();
+    };
+
+    render();
+
+    fetch('https://api.github.com/repos/lumora-launcher/lumora-launcher/releases?per_page=10')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list) => {
+        if (!Array.isArray(list)) return;
+        const stableRel = list.find((r) => !r.draft && !r.prerelease);
+        const betaRel = list.find((r) => !r.draft && r.prerelease);
+        if (stableRel) {
+          stableVer = stableRel.tag_name || stableRel.name || '';
+          const exe = (stableRel.assets || []).find((a) => /\.exe$/i.test(a.name));
+          if (exe) document.getElementById('btnDlStable').href = exe.browser_download_url;
+        }
+        if (betaRel) {
+          betaVer = betaRel.tag_name || betaRel.name || '';
+          const exe = (betaRel.assets || []).find((a) => /\.exe$/i.test(a.name));
+          if (exe) document.getElementById('btnDlBeta').href = exe.browser_download_url;
+        }
+        render();
+      })
+      .catch(() => {});
+  </script>
+</body>
+</html>

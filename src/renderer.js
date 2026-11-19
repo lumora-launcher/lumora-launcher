@@ -1299,6 +1299,14 @@ async function renderWorldsTab(inst, container) {
 }
 
 // Ekran Görüntüleri Sekmesi
+let activeScreenshotPreview = null;
+
+async function copyScreenshotToClipboard(instanceId, fileName) {
+  const res = await window.api.copyScreenshot(instanceId, fileName);
+  if (res && res.ok) toast(i18nT('sc_copied_toast'));
+  else toast((res && res.error) || 'Copy error', true);
+}
+
 async function renderScreenshotsTab(inst, container) {
   const shots = await window.api.listScreenshots({ instanceId: inst.id });
   if (!shots.length) {
@@ -1312,14 +1320,36 @@ async function renderScreenshotsTab(inst, container) {
     const card = document.createElement('div');
     card.className = 'sc-card';
     card.innerHTML = `
+      <div class="sc-card-actions">
+        <button type="button" class="sc-mini-btn" data-copy-sc>${i18nT('sc_copy_btn')}</button>
+      </div>
       <img src="${s.dataUrl || ''}" alt="" />
       <div class="sc-card-foot">${s.fileName}</div>
     `;
-    card.onclick = () => window.api.openInstanceFolder(inst.id, 'screenshots');
+    card.querySelector('[data-copy-sc]').onclick = (e) => {
+      e.stopPropagation();
+      copyScreenshotToClipboard(inst.id, s.fileName);
+    };
+    card.onclick = () => {
+      activeScreenshotPreview = { instanceId: inst.id, fileName: s.fileName };
+      $('scPreviewTitle').textContent = s.fileName;
+      $('scPreviewImg').src = s.dataUrl || '';
+      $('screenshotPreviewModal').classList.remove('hidden');
+    };
     grid.appendChild(card);
   }
   container.appendChild(grid);
 }
+
+$('btnScPreviewClose').onclick = () => $('screenshotPreviewModal').classList.add('hidden');
+$('btnScPreviewFolder').onclick = () => {
+  if (activeScreenshotPreview) window.api.openInstanceFolder(activeScreenshotPreview.instanceId, 'screenshots');
+};
+$('btnScPreviewCopy').onclick = () => {
+  if (activeScreenshotPreview) {
+    copyScreenshotToClipboard(activeScreenshotPreview.instanceId, activeScreenshotPreview.fileName);
+  }
+};
 
 // Config & Ayarlar Sekmesi
 let editingConfigState = null;
@@ -2536,7 +2566,228 @@ $('btnAddServer').onclick = async () => {
   refreshServers();
 };
 
-async function launchWithQuickPlay({ server = null, world = null } = {}) {
+// ---------------- Mod & Bağımlılık Doktoru ----------------
+let modDoctorPreLaunchCb = null;
+
+async function runModDoctorUI(inst, preLaunchCallback = null) {
+  if (!inst) return;
+  modDoctorPreLaunchCb = preLaunchCallback;
+  const res = await window.api.runModDoctor(inst.id);
+  const listEl = $('modDoctorList');
+  const summaryEl = $('modDoctorSummary');
+  const launchBtn = $('btnModDoctorLaunchAnyway');
+
+  if (!res || !res.ok) {
+    return toast((res && res.error) || 'Mod Doctor error', true);
+  }
+
+  listEl.innerHTML = '';
+  const issues = res.issues || [];
+  if (!issues.length) {
+    summaryEl.textContent = i18nFmt('doc_clean_fmt', { n: res.modsScanned || 0 });
+    summaryEl.className = 'badge ok-badge';
+    listEl.innerHTML = `<div class="empty-state">${i18nFmt('doc_clean_fmt', { n: res.modsScanned || 0 })}</div>`;
+    launchBtn.classList.add('hidden');
+  } else {
+    summaryEl.textContent = i18nFmt('doc_issues_fmt', { n: res.modsScanned || 0, c: issues.length });
+    summaryEl.className = 'badge warn-badge';
+    launchBtn.classList.toggle('hidden', !preLaunchCallback);
+
+    for (const iss of issues) {
+      const row = document.createElement('div');
+      row.className = `doctor-issue-item${iss.type === 'mc_mismatch' ? ' error' : ''}`;
+      const descText =
+        iss.type === 'mc_mismatch'
+          ? i18nFmt('doc_mc_mismatch', { req: iss.requiredVer, cur: iss.currentVer })
+          : i18nFmt('doc_missing_dep', { dep: iss.depId });
+
+      row.innerHTML = `
+        <div class="doctor-issue-info">
+          <strong></strong>
+          <span></span>
+        </div>
+        ${iss.searchQuery ? `<button type="button" class="ghost-btn accent-border" data-doc-mr>${i18nT('doc_search_mr')}</button>` : ''}
+      `;
+      row.querySelector('strong').textContent = `${iss.modName} (${iss.fileName})`;
+      row.querySelector('span').textContent = descText;
+      const mrBtn = row.querySelector('[data-doc-mr]');
+      if (mrBtn) {
+        mrBtn.onclick = () => {
+          $('modDoctorModal').classList.add('hidden');
+          navigateTo('modrinth');
+          $('modrinthSearchInput').value = iss.searchQuery;
+          runModrinthSearch(false);
+        };
+      }
+      listEl.appendChild(row);
+    }
+  }
+
+  $('modDoctorModal').classList.remove('hidden');
+}
+
+$('btnModDoctor').onclick = () => runModDoctorUI(getActiveInstance(), null);
+$('btnModDoctorClose').onclick = () => {
+  modDoctorPreLaunchCb = null;
+  $('modDoctorModal').classList.add('hidden');
+};
+$('btnModDoctorCloseIcon').onclick = () => {
+  modDoctorPreLaunchCb = null;
+  $('modDoctorModal').classList.add('hidden');
+};
+$('btnModDoctorLaunchAnyway').onclick = async () => {
+  const cb = modDoctorPreLaunchCb;
+  modDoctorPreLaunchCb = null;
+  $('modDoctorModal').classList.add('hidden');
+  if (typeof cb === 'function') await cb();
+};
+
+// ---------------- Ctrl+K Hızlı Komut Paleti ----------------
+let cmdPaletteItems = [];
+let cmdPaletteActiveIdx = 0;
+
+function toggleCmdPalette(forceState = null) {
+  const modal = $('cmdPaletteModal');
+  const open = forceState !== null ? forceState : modal.classList.contains('hidden');
+  modal.classList.toggle('hidden', !open);
+  if (open) {
+    $('cmdPaletteInput').value = '';
+    cmdPaletteActiveIdx = 0;
+    renderCmdPalette();
+    setTimeout(() => $('cmdPaletteInput').focus(), 20);
+  }
+}
+
+function renderCmdPalette() {
+  const q = ($('cmdPaletteInput').value || '').trim().toLowerCase();
+  const listEl = $('cmdPaletteList');
+  listEl.innerHTML = '';
+
+  const actions = [];
+  if (q) {
+    actions.push({
+      icon: '🟢',
+      title: `Modrinth: "${$('cmdPaletteInput').value.trim()}"`,
+      sub: i18nT('mr_page_title'),
+      tag: 'Modrinth',
+      run: () => {
+        navigateTo('modrinth');
+        $('modrinthSearchInput').value = $('cmdPaletteInput').value.trim();
+        runModrinthSearch(false);
+      }
+    });
+  }
+
+  actions.push(
+    { icon: '▶', title: i18nT('play_btn'), sub: getActiveInstance() ? getActiveInstance().name : '', tag: 'Launch', run: () => launchWithQuickPlay() },
+    { icon: '🩺', title: i18nT('btn_mod_doctor').replace(/^\S+\s+/, ''), sub: i18nT('doc_title').replace(/^\S+\s+/, ''), tag: 'Doctor', run: () => runModDoctorUI(getActiveInstance(), null) },
+    { icon: '👕', title: (i18nT('skin_studio_badge') || '3D Skin Studio').replace(/^\S+\s+/, ''), sub: 'Steve / Alex', tag: 'Skin', run: () => openSkinStudio() },
+    { icon: '🔄', title: i18nT('upd_check_btn'), sub: `v${sys.appVersion}`, tag: 'Update', run: () => { navigateTo('updates'); window.api.checkForUpdates(); } },
+    { icon: '🧹', title: i18nT('btn_clear_cache').replace(/^\S+\s+/, ''), sub: i18nT('set_advanced'), tag: 'Cache', run: () => $('btnClearCache').click() },
+    { icon: '📂', title: i18nT('nav_folder'), sub: settings.gameDir, tag: 'Folder', run: () => window.api.openFolder() }
+  );
+
+  for (const inst of instances) {
+    actions.push({
+      icon: getInstIcon(inst),
+      title: inst.name,
+      sub: `${LOADER_LABELS[inst.loader] || inst.loader} ${inst.mcVersion}`,
+      tag: i18nT('nav_instances'),
+      run: () => {
+        selectActiveInstance(inst.id);
+        navigateTo('instances');
+      }
+    });
+  }
+
+  const themes = [
+    ['aurora', 'Aurora'],
+    ['emerald', 'Emerald'],
+    ['nether', 'Nether'],
+    ['cyber', 'Cyberpunk'],
+    ['frost', 'Frost']
+  ];
+  for (const [tid, tname] of themes) {
+    actions.push({
+      icon: '🎨',
+      title: `${tname}`,
+      sub: i18nT('nav_appearance'),
+      tag: 'Theme',
+      run: () => {
+        applyTheme(tid);
+        persist({ theme: tid });
+      }
+    });
+  }
+
+  cmdPaletteItems = q
+    ? actions.filter((a) => `${a.title} ${a.sub} ${a.tag}`.toLowerCase().includes(q))
+    : actions;
+  cmdPaletteActiveIdx = Math.min(cmdPaletteActiveIdx, Math.max(0, cmdPaletteItems.length - 1));
+
+  cmdPaletteItems.slice(0, 12).forEach((item, idx) => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = `cmd-item${idx === cmdPaletteActiveIdx ? ' active' : ''}`;
+    row.innerHTML = `
+      <div class="cmd-item-left">
+        <span>${item.icon}</span>
+        <div>
+          <strong></strong>
+          <small></small>
+        </div>
+      </div>
+      <span class="cmd-item-tag"></span>
+    `;
+    row.querySelector('strong').textContent = item.title;
+    row.querySelector('small').textContent = item.sub || '';
+    row.querySelector('.cmd-item-tag').textContent = item.tag || '';
+    row.onclick = () => {
+      toggleCmdPalette(false);
+      item.run();
+    };
+    listEl.appendChild(row);
+  });
+}
+
+$('btnOpenCmdPalette').onclick = () => toggleCmdPalette(true);
+$('cmdPaletteInput').addEventListener('input', () => {
+  cmdPaletteActiveIdx = 0;
+  renderCmdPalette();
+});
+$('cmdPaletteInput').addEventListener('keydown', (e) => {
+  const maxIdx = Math.min(cmdPaletteItems.length, 12) - 1;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    cmdPaletteActiveIdx = Math.min(maxIdx, cmdPaletteActiveIdx + 1);
+    renderCmdPalette();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    cmdPaletteActiveIdx = Math.max(0, cmdPaletteActiveIdx - 1);
+    renderCmdPalette();
+  } else if (e.key === 'Enter' && cmdPaletteItems[cmdPaletteActiveIdx]) {
+    e.preventDefault();
+    const picked = cmdPaletteItems[cmdPaletteActiveIdx];
+    toggleCmdPalette(false);
+    picked.run();
+  } else if (e.key === 'Escape') {
+    toggleCmdPalette(false);
+  }
+});
+$('cmdPaletteModal').addEventListener('click', (e) => {
+  if (e.target === $('cmdPaletteModal')) toggleCmdPalette(false);
+});
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    toggleCmdPalette();
+  } else if (e.key === 'Escape') {
+    $('cmdPaletteModal').classList.add('hidden');
+    $('screenshotPreviewModal').classList.add('hidden');
+  }
+});
+
+async function launchWithQuickPlay({ server = null, world = null, skipDoctor = false } = {}) {
   if (!validateUsername()) {
     navigateTo('home');
     $('username').focus();
@@ -2544,6 +2795,15 @@ async function launchWithQuickPlay({ server = null, world = null } = {}) {
   }
   const inst = getActiveInstance();
   if (!inst) return toast('Lütfen bir profil seçin', true);
+
+  if (!skipDoctor && inst.loader !== 'vanilla' && inst.loader !== 'optifine' && (inst.modsCount || 0) > 0) {
+    try {
+      const doc = await window.api.runModDoctor(inst.id);
+      if (doc && doc.ok && doc.issues && doc.issues.length > 0) {
+        return runModDoctorUI(inst, () => launchWithQuickPlay({ server, world, skipDoctor: true }));
+      }
+    } catch {}
+  }
 
   navigateTo('home');
   let javaPath = settings.javaPath;

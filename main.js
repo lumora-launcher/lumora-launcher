@@ -3505,3 +3505,220 @@ ipcMain.handle('cache:clear', () => {
     return { ok: false, error: err.message || String(err) };
   }
 });
+
+// ---------------- Ekran Görüntüsü Panoya Kopyalama ----------------
+ipcMain.handle('screenshots:copy', (_e, { instanceId, fileName }) => {
+  try {
+    const safeName = path.basename(String(fileName || ''));
+    if (!safeName) return { ok: false, error: 'Geçersiz dosya adı.' };
+    const fp = path.join(getInstanceDir(instanceId || 'default-vanilla'), 'screenshots', safeName);
+    if (!fs.existsSync(fp)) return { ok: false, error: 'Ekran görüntüsü bulunamadı.' };
+    const img = nativeImage.createFromPath(fp);
+    if (img.isEmpty()) return { ok: false, error: 'Görsel okunamadı.' };
+    clipboard.writeImage(img);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+// ---------------- Oyun Öncesi Mod & Bağımlılık Doktoru ----------------
+function addNestedJarIds(entryName, installedIds) {
+  const base = path.basename(entryName, '.jar').toLowerCase();
+  if (!base) return;
+  const clean = base.replace(/[-_](?:mc\d[\w.+]*|v?\d+\.\d+[\w.+-]*)$/i, '');
+  if (clean) installedIds.add(clean);
+  if (clean.includes('-')) {
+    const parts = clean.split('-');
+    for (let i = 1; i <= parts.length; i++) {
+      const prefix = parts.slice(0, i).join('-');
+      if (prefix.length >= 3) installedIds.add(prefix);
+    }
+  }
+}
+
+ipcMain.handle('mods:doctor', (_e, { instanceId }) => {
+  try {
+    const inst = loadInstances().find((x) => x.id === instanceId);
+    if (!inst) return { ok: false, error: 'Profil bulunamadı.' };
+
+    const modsDir = path.join(getInstanceDir(inst.id), 'mods');
+    if (!fs.existsSync(modsDir)) return { ok: true, modsScanned: 0, issues: [] };
+
+    const jarFiles = fs
+      .readdirSync(modsDir, { withFileTypes: true })
+      .filter((e) => e.isFile() && /\.jar$/i.test(e.name))
+      .map((e) => e.name);
+
+    const installedIds = new Set([
+      'minecraft',
+      'java',
+      'fabricloader',
+      'quilt_loader',
+      'forge',
+      'neoforge',
+      'fml',
+      'javafml'
+    ]);
+    let hasFabricApi = false;
+    const parsedMods = [];
+
+    for (const fileName of jarFiles) {
+      const fullPath = path.join(modsDir, fileName);
+      try {
+        const zip = new AdmZip(fullPath);
+        const fabricEntry = zip.getEntry('fabric.mod.json') || zip.getEntry('quilt.mod.json');
+        if (fabricEntry) {
+          let rawText = zip.readAsText(fabricEntry).replace(/^\uFEFF/, '');
+          const json = JSON.parse(rawText);
+          const root = json.quilt_loader || json;
+          const id = String(root.id || json.id || '').toLowerCase().trim();
+          const modName = String((root.metadata && root.metadata.name) || json.name || id || fileName);
+          if (id) {
+            installedIds.add(id);
+            if (id === 'fabric-api' || id === 'fabric' || id === 'quilted_fabric_api' || id === 'qsl') {
+              hasFabricApi = true;
+            }
+          }
+          if (Array.isArray(json.provides)) {
+            for (const p of json.provides) {
+              if (p) installedIds.add(String(p).toLowerCase());
+            }
+          } else if (json.provides && typeof json.provides === 'object') {
+            for (const p of Object.keys(json.provides)) {
+              if (p) installedIds.add(String(p).toLowerCase());
+            }
+          }
+          if (Array.isArray(json.jars)) {
+            for (const j of json.jars) {
+              if (j && j.file) addNestedJarIds(j.file, installedIds);
+            }
+          }
+          for (const ze of zip.getEntries()) {
+            const en = String(ze.entryName || '').replace(/\\/g, '/');
+            if (en.startsWith('META-INF/jars/') && en.endsWith('.jar')) {
+              addNestedJarIds(en, installedIds);
+            }
+          }
+          const depends = root.depends || json.depends || {};
+          parsedMods.push({ fileName, modId: id, modName, loaderType: 'fabric', depends });
+          continue;
+        }
+
+        const tomlEntry = zip.getEntry('META-INF/neoforge.mods.toml') || zip.getEntry('META-INF/mods.toml');
+        if (tomlEntry) {
+          const toml = zip.readAsText(tomlEntry);
+          const topSection = toml.split(/\[\[dependencies/i)[0] || toml;
+          const modIdMatches = [...topSection.matchAll(/^\s*modId\s*=\s*"([^"]+)"/gm)].map((m) =>
+            m[1].toLowerCase().trim()
+          );
+          const nameMatch = topSection.match(/^\s*displayName\s*=\s*"([^"]+)"/m);
+          const primaryId = modIdMatches[0] || '';
+          const modName = nameMatch ? nameMatch[1] : primaryId || fileName;
+          for (const mid of modIdMatches) {
+            if (mid) installedIds.add(mid);
+          }
+
+          const forgeDeps = [];
+          const depBlocks = toml.split(/\[\[dependencies\.[^\]]+\]\]/i).slice(1);
+          for (const blk of depBlocks) {
+            const depIdMatch = blk.match(/^\s*modId\s*=\s*"([^"]+)"/m);
+            const mandatoryMatch = blk.match(/^\s*mandatory\s*=\s*(true|false)/m);
+            const typeMatch = blk.match(/^\s*type\s*=\s*"([^"]+)"/m);
+            const isRequired = typeMatch
+              ? typeMatch[1].toLowerCase() === 'required'
+              : mandatoryMatch
+              ? mandatoryMatch[1] === 'true'
+              : true;
+            if (depIdMatch && isRequired) {
+              forgeDeps.push(depIdMatch[1].trim());
+            }
+          }
+          parsedMods.push({ fileName, modId: primaryId, modName, loaderType: 'forge', forgeDeps });
+        }
+      } catch {
+        // Bozuk veya standart dışı JAR dosyalarını yoksay
+      }
+    }
+
+    const instMinorMatch = String(inst.mcVersion || '').match(/^(1\.\d+)/);
+    const instMinor = instMinorMatch ? instMinorMatch[1] : '';
+    const issues = [];
+    const seenIssues = new Set();
+
+    for (const m of parsedMods) {
+      if (m.loaderType === 'fabric' && m.depends && typeof m.depends === 'object') {
+        const entries = Array.isArray(m.depends)
+          ? m.depends.map((d) => [typeof d === 'string' ? d : d && d.id, typeof d === 'object' && d ? d.versions : '*'])
+          : Object.entries(m.depends);
+
+        for (const [depKeyRaw, depVal] of entries) {
+          if (!depKeyRaw) continue;
+          const depKey = String(depKeyRaw).trim();
+          const k = depKey.toLowerCase();
+          if (k === 'java' || k === 'fabricloader' || k === 'quilt_loader') continue;
+
+          if (k === 'minecraft') {
+            if (typeof depVal === 'string' && instMinor) {
+              const trimVal = depVal.trim();
+              if (!/[>*x]/i.test(trimVal)) {
+                const explicitMatch = trimVal.match(/^[=~]?\s*(1\.\d+)(?:\.\d+)?$/);
+                if (explicitMatch && explicitMatch[1] !== instMinor) {
+                  const key = `mc:${m.fileName}`;
+                  if (!seenIssues.has(key)) {
+                    seenIssues.add(key);
+                    issues.push({
+                      type: 'mc_mismatch',
+                      modName: m.modName,
+                      fileName: m.fileName,
+                      depId: 'minecraft',
+                      requiredVer: trimVal,
+                      currentVer: inst.mcVersion
+                    });
+                  }
+                }
+              }
+            }
+            continue;
+          }
+
+          if (installedIds.has(k) || ((k === 'fabric' || k.startsWith('fabric-')) && hasFabricApi)) {
+            continue;
+          }
+          const searchQuery = k === 'fabric' || k.startsWith('fabric-') ? 'fabric-api' : depKey;
+          const key = `dep:${m.fileName}:${k}`;
+          if (!seenIssues.has(key)) {
+            seenIssues.add(key);
+            issues.push({
+              type: 'missing_dep',
+              modName: m.modName,
+              fileName: m.fileName,
+              depId: depKey,
+              searchQuery
+            });
+          }
+        }
+      } else if (m.loaderType === 'forge' && Array.isArray(m.forgeDeps)) {
+        for (const depKey of m.forgeDeps) {
+          const k = depKey.toLowerCase();
+          if (installedIds.has(k)) continue;
+          const key = `dep:${m.fileName}:${k}`;
+          if (!seenIssues.has(key)) {
+            seenIssues.add(key);
+            issues.push({
+              type: 'missing_dep',
+              modName: m.modName,
+              fileName: m.fileName,
+              depId: depKey,
+              searchQuery: depKey
+            });
+          }
+        }
+      }
+    }
+
+    return { ok: true, modsScanned: parsedMods.length, issues };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});

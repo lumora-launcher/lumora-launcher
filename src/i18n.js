@@ -1792,7 +1792,111 @@
     }
   };
 
+  const V130_TRANSLATIONS = {
+    tr: {
+      btn_mod_doctor: '🩺 Mod Doktoru',
+      doc_title: '🩺 Mod & Bağımlılık Doktoru',
+      doc_clean_fmt: '✓ {n} mod tarandı: Eksik kütüphane veya sürüm çakışması bulunmadı!',
+      doc_issues_fmt: '⚠ {n} mod tarandı, {c} olası sorun bulundu:',
+      doc_missing_dep: 'Eksik Kütüphane: "{dep}" gerektiriyor',
+      doc_mc_mismatch: 'Sürüm Uyumsuzluğu: MC {req} için yapılmış (Profil: {cur})',
+      doc_search_mr: "🔍 Modrinth'te Bul",
+      doc_launch_anyway: '▶ Yine de Oyunu Başlat',
+      sc_copy_btn: '📋 Kopyala',
+      sc_copy_preview_btn: '📋 Resmi Panoya Kopyala',
+      sc_copied_toast: '📋 Ekran görüntüsü panoya kopyalandı! (Ctrl+V ile yapıştırabilirsin)',
+      cmd_ph: "Profil değiştir, Modrinth'te ara, komut çalıştır... (Ctrl+K)"
+    },
+    en: {
+      btn_mod_doctor: '🩺 Mod Doctor',
+      doc_title: '🩺 Mod & Dependency Doctor',
+      doc_clean_fmt: '✓ {n} mods scanned: No missing dependencies or version conflicts found!',
+      doc_issues_fmt: '⚠ {n} mods scanned, {c} potential issue(s) found:',
+      doc_missing_dep: 'Missing Dependency: requires "{dep}"',
+      doc_mc_mismatch: 'Version Mismatch: built for MC {req} (Profile: {cur})',
+      doc_search_mr: '🔍 Find on Modrinth',
+      doc_launch_anyway: '▶ Launch Anyway',
+      sc_copy_btn: '📋 Copy',
+      sc_copy_preview_btn: '📋 Copy Image to Clipboard',
+      sc_copied_toast: '📋 Screenshot copied to clipboard! (Paste with Ctrl+V)',
+      cmd_ph: 'Switch profile, search Modrinth, run command... (Ctrl+K)'
+    },
+    de: {
+      btn_mod_doctor: '🩺 Mod-Doktor',
+      doc_title: '🩺 Mod- & Abhängigkeits-Doktor',
+      doc_clean_fmt: '✓ {n} Mods geprüft: Keine fehlenden Bibliotheken oder Konflikte!',
+      doc_issues_fmt: '⚠ {n} Mods geprüft, {c} mögliche Probleme gefunden:',
+      doc_missing_dep: 'Fehlende Bibliothek: benötigt "{dep}"',
+      doc_mc_mismatch: 'Versionskonflikt: für MC {req} erstellt (Profil: {cur})',
+      doc_search_mr: '🔍 Auf Modrinth suchen',
+      doc_launch_anyway: '▶ Trotzdem starten',
+      sc_copy_btn: '📋 Kopieren',
+      sc_copy_preview_btn: '📋 Bild in Zwischenablage kopieren',
+      sc_copied_toast: '📋 Screenshot kopiert! (Einfügen mit Strg+V)',
+      cmd_ph: 'Profil wechseln, Modrinth durchsuchen, Befehl ausführen... (Strg+K)'
+    },
+    es: {
+      btn_mod_doctor: '🩺 Doctor de Mods',
+      doc_title: '🩺 Doctor de Mods y Dependencias',
+      doc_clean_fmt: '✓ {n} mods analizados: ¡Sin dependencias faltantes ni conflictos!',
+      doc_issues_fmt: '⚠ {n} mods analizados, {c} problema(s) encontrado(s):',
+      doc_missing_dep: 'Dependencia faltante: requiere "{dep}"',
+      doc_mc_mismatch: 'Versión incompatible: hecho para MC {req} (Perfil: {cur})',
+      doc_search_mr: '🔍 Buscar en Modrinth',
+      doc_launch_anyway: '▶ Iniciar de todos modos',
+      sc_copy_btn: '📋 Copiar',
+      sc_copy_preview_btn: '📋 Copiar imagen al portapapeles',
+      sc_copied_toast: '📋 ¡Captura copiada al portapapeles! (Pega con Ctrl+V)',
+      cmd_ph: 'Cambiar perfil, buscar en Modrinth, ejecutar comando... (Ctrl+K)'
+    },
+    ru: {
+      btn_mod_doctor: '🩺 Доктор модов',
+      doc_title: '🩺 Проверка модов и зависимостей',
+      doc_clean_fmt: '✓ Проверено модов: {n}. Пропущенных библиотек и конфликтов не найдено!',
+      doc_issues_fmt: '⚠ Проверено модов: {n}, найдено проблем: {c}:',
+      doc_missing_dep: 'Нет библиотеки: требуется "{dep}"',
+      doc_mc_mismatch: 'Несовместимая версия: для MC {req} (Профиль: {cur})',
+      doc_search_mr: '🔍 Найти в Modrinth',
+      doc_launch_anyway: '▶ Всё равно запустить',
+      sc_copy_btn: '📋 Копировать',
+      sc_copy_preview_btn: '📋 Копировать в буфер',
+      sc_copied_toast: '📋 Скриншот скопирован в буфер! (Вставить: Ctrl+V)',
+      cmd_ph: 'Сменить профиль, поиск Modrinth, команда... (Ctrl+K)'
+    },
+    fr: {
+      btn_mod_doctor: '🩺 Docteur de Mods',
+      doc_title: '🩺 Analyse des Mods & Dépendances',
+      doc_clean_fmt: '✓ {n} mods analysés : aucune dépendance manquante ni conflit !',
+      doc_issues_fmt: '⚠ {n} mods analysés, {c} problème(s) détecté(s) :',
+      doc_missing_dep: 'Dépendance manquante : requiert "{dep}"',
+      doc_mc_mismatch: 'Version incompatible : conçu pour MC {req} (Profil : {cur})',
+      doc_search_mr: '🔍 Chercher sur Modrinth',
+      doc_launch_anyway: '▶ Lancer quand même',
+      sc_copy_btn: '📋 Copier',
+      sc_copy_preview_btn: "📋 Copier l'image dans le presse-papiers",
+      sc_copied_toast: '📋 Capture copiée ! (Coller avec Ctrl+V)',
+      cmd_ph: 'Changer de profil, chercher sur Modrinth, commande... (Ctrl+K)'
+    },
+    pt: {
+      btn_mod_doctor: '🩺 Doutor de Mods',
+      doc_title: '🩺 Doutor de Mods e Dependências',
+      doc_clean_fmt: '✓ {n} mods verificados: Nenhuma dependência faltando!',
+      doc_issues_fmt: '⚠ {n} mods verificados, {c} possível(is) problema(s):',
+      doc_missing_dep: 'Dependência faltando: requer "{dep}"',
+      doc_mc_mismatch: 'Incompatível: feito para MC {req} (Perfil: {cur})',
+      doc_search_mr: '🔍 Buscar no Modrinth',
+      doc_launch_anyway: '▶ Iniciar mesmo assim',
+      sc_copy_btn: '📋 Copiar',
+      sc_copy_preview_btn: '📋 Copiar imagem para área de transferência',
+      sc_copied_toast: '📋 Captura copiada! (Cole com Ctrl+V)',
+      cmd_ph: 'Trocar perfil, buscar no Modrinth, comando... (Ctrl+K)'
+    }
+  };
+
   for (const [k, obj] of Object.entries(POPUP_TRANSLATIONS)) {
+    if (EXTRA_TRANSLATIONS[k]) Object.assign(EXTRA_TRANSLATIONS[k], obj);
+  }
+  for (const [k, obj] of Object.entries(V130_TRANSLATIONS)) {
     if (EXTRA_TRANSLATIONS[k]) Object.assign(EXTRA_TRANSLATIONS[k], obj);
   }
 
@@ -2046,6 +2150,11 @@
     setText('#btnSkinDownloadPng', d.skin_dl_png);
     setText('#dropOverlayTitle', d.drop_title);
     setText('#dropOverlaySub', d.drop_sub);
+    setText('#btnModDoctor', d.btn_mod_doctor);
+    setText('#modDoctorModal .modal-head h3', d.doc_title);
+    setText('#btnModDoctorLaunchAnyway .play-label', d.doc_launch_anyway);
+    setText('#btnScPreviewCopy .play-label', d.sc_copy_preview_btn);
+    setPlaceholder('#cmdPaletteInput', d.cmd_ph);
 
     return activeLang;
   }

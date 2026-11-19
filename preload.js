@@ -101,10 +101,12 @@ contextBridge.exposeInMainWorld('api', {
   onState: on('game:state'),
   onCrash: on('game:crash'),
 
-  // Sürükle-bırak & Önbellek
+  // Sürükle-bırak & Önbellek & Mod Doktoru & Ekran Görüntüsü
   getPathForFile: (file) => (webUtils && webUtils.getPathForFile ? webUtils.getPathForFile(file) : (file && file.path) || ''),
   installDroppedFiles: (instanceId, filePaths) => ipcRenderer.invoke('instance:installDroppedFiles', { instanceId, filePaths }),
   clearCache: () => ipcRenderer.invoke('cache:clear'),
+  runModDoctor: (instanceId) => ipcRenderer.invoke('mods:doctor', { instanceId }),
+  copyScreenshot: (instanceId, fileName) => ipcRenderer.invoke('screenshots:copy', { instanceId, fileName }),
 
   // Güncelleme
   checkForUpdates: () => ipcRenderer.invoke('update:check'),

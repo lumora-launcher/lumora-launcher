@@ -1308,6 +1308,197 @@ html[data-channel="beta"] .update-popup-icon {
   max-width: 390px;
 }
 
+/* ---------- Ctrl+K Komut Paleti & Başlık Arama Çubuğu ---------- */
+.cmd-k-pill {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 99px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.cmd-k-pill:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: rgba(124, 92, 255, 0.16);
+}
+.cmd-k-pill span {
+  font-family: ui-monospace, monospace;
+  font-size: 10.5px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.modal-cmd {
+  width: min(580px, 92vw);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cmd-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(139, 124, 255, 0.35);
+}
+.cmd-search-ico { font-size: 15px; opacity: 0.8; }
+.cmd-input-row .cmd-input {
+  flex: 1;
+  width: auto;
+  padding: 2px 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  outline: none;
+  color: var(--text);
+  font-size: 14px;
+}
+.cmd-input-row .cmd-input:focus {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+.cmd-list {
+  max-height: 340px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 124, 255, 0.35) transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.cmd-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+}
+.cmd-item:hover,
+.cmd-item.active {
+  background: rgba(124, 92, 255, 0.18);
+  border-color: rgba(139, 124, 255, 0.42);
+}
+.cmd-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.cmd-item-left strong {
+  font-size: 13px;
+  display: block;
+}
+.cmd-item-left small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.cmd-item-tag {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---------- Mod Doktoru & Ekran Görüntüsü Önizleme ---------- */
+.doctor-list {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.doctor-issue-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: rgba(255, 184, 77, 0.08);
+  border: 1px solid rgba(255, 184, 77, 0.35);
+}
+.doctor-issue-item.error {
+  background: rgba(255, 107, 139, 0.1);
+  border-color: rgba(255, 107, 139, 0.42);
+}
+.doctor-issue-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.doctor-issue-info strong { font-size: 13px; }
+.doctor-issue-info span { font-size: 12px; color: var(--muted); }
+
+.sc-card {
+  position: relative;
+}
+.sc-card-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.18s;
+}
+.sc-card:hover .sc-card-actions {
+  opacity: 1;
+}
+.sc-mini-btn {
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(12, 16, 30, 0.85);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sc-mini-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.modal-sc-preview {
+  width: min(760px, 94vw);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sc-preview-frame {
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: grid;
+  place-items: center;
+}
+.sc-preview-frame img {
+  max-width: 100%;
+  max-height: 62vh;
+  object-fit: contain;
+  display: block;
+}
+
 /* ---------- Toast ---------- */
 .toast {
   position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 30px);

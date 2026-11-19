@@ -49,10 +49,11 @@
       </div>
       <span class="brand-name">Lumora</span>
       <span class="beta-pill" id="betaChannelBadge" title="Beta Önizleme Kanalı — Normal sürümden bağımsız kurulur">🧪 BETA</span>
-      <span class="version-pill" id="appVersionBadge" title="Güncellemeleri kontrol et">v1.2.2-beta</span>
+      <span class="version-pill" id="appVersionBadge" title="Güncellemeleri kontrol et">v1.3.0</span>
     </div>
 
     <div class="titlebar-quick">
+      <button type="button" class="cmd-k-pill" id="btnOpenCmdPalette" title="Hızlı Komut Paleti (Ctrl+K)">🔍 <span>Ctrl+K</span></button>
       <select id="titlebarLangSelect" class="titlebar-lang-select" title="Dil / Language">
         <option value="tr">🇹🇷 TR</option>
         <option value="en">🇬🇧 EN</option>
@@ -331,6 +332,7 @@
               <button class="ghost-btn" id="btnDuplicateInstance" title="Bu profili tüm modları ve ayarlarıyla kopyala">📋 Profili Çoğalt</button>
               <button class="ghost-btn hidden" id="btnPrepareBaseVersion" title="Bu profilin ihtiyaç duyduğu ana Minecraft sürümünü şimdi indir">⬇ Ana Sürümü Şimdi İndir</button>
               <button class="ghost-btn accent-border" id="btnInstallFpsPack" title="Sodium, Lithium, FerriteCore, EntityCulling kur">⚡ Tek Tıkla FPS Paketi Kur</button>
+              <button class="ghost-btn" id="btnModDoctor" title="Eksik mod kütüphanelerini ve sürüm uyumunu denetle">🩺 Mod Doktoru</button>
               <button class="ghost-btn" id="btnCheckModUpdates" title="Kurulu modları Modrinth üzerinden güncelle">🔄 Mod Güncellemelerini Denetle</button>
               <button class="ghost-btn" id="btnExportMrpack" title="Bu profili .mrpack modpack dosyası olarak dışa aktar">📤 .mrpack Dışa Aktar</button>
               <button class="ghost-btn" id="btnOpenInstModrinth">+ Modrinth'ten Ekle</button>
@@ -731,7 +733,7 @@
                 <div>
                   <div class="update-ver-line">
                     <h3>Lumora Launcher</h3>
-                    <span class="badge" id="currentVerText">v1.2.2-beta</span>
+                    <span class="badge" id="currentVerText">v1.3.0</span>
                     <span class="verified-pill" id="releaseChannelPill">✓ Resmi Sürüm</span>
                   </div>
                   <p class="sub-sm" id="updateStatusTitle">Güncellemeler resmi GitHub sunucusu üzerinden otomatik denetlenir.</p>
@@ -823,6 +825,60 @@
         <pre class="console glass" id="console"></pre>
       </section>
     </main>
+  </div>
+
+  <!-- Mod Doktoru Rapor Modalı -->
+  <div class="modal-backdrop hidden" id="modDoctorModal">
+    <div class="modal-card modal-wide glass">
+      <div class="modal-head update-popup-head">
+        <div>
+          <span class="badge" id="modDoctorSummary">🩺 Mod & Bağımlılık Raporu</span>
+          <h3>🩺 Mod & Bağımlılık Doktoru</h3>
+        </div>
+        <button class="icon-btn" id="btnModDoctorCloseIcon" title="Kapat">✕</button>
+      </div>
+      <div class="doctor-list" id="modDoctorList"></div>
+      <div class="modal-actions update-popup-actions">
+        <button class="ghost-btn" id="btnModDoctorClose">Kapat</button>
+        <button class="play-btn sm-btn hidden" id="btnModDoctorLaunchAnyway">
+          <span class="play-label">▶ Yine de Oyunu Başlat</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ekran Görüntüsü Önizleme Modalı -->
+  <div class="modal-backdrop hidden" id="screenshotPreviewModal">
+    <div class="modal-card modal-sc-preview glass">
+      <div class="modal-head update-popup-head">
+        <div>
+          <span class="badge">📸 F2 Ekran Görüntüsü</span>
+          <h3 id="scPreviewTitle">screenshot.png</h3>
+        </div>
+        <button class="icon-btn" id="btnScPreviewClose" title="Kapat">✕</button>
+      </div>
+      <div class="sc-preview-frame">
+        <img id="scPreviewImg" src="" alt="" />
+      </div>
+      <div class="modal-actions update-popup-actions">
+        <button class="ghost-btn" id="btnScPreviewFolder">📂 Klasörde Göster</button>
+        <button class="play-btn sm-btn" id="btnScPreviewCopy">
+          <span class="play-label">📋 Resmi Panoya Kopyala</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ctrl+K Hızlı Komut Paleti Modalı -->
+  <div class="modal-backdrop hidden" id="cmdPaletteModal">
+    <div class="modal-card modal-cmd glass">
+      <div class="cmd-input-row">
+        <span class="cmd-search-ico">🔍</span>
+        <input id="cmdPaletteInput" class="cmd-input" placeholder="Profil seç, Modrinth'te mod ara, tema değiştir veya komut çalıştır..." autocomplete="off" spellcheck="false" />
+        <span class="badge">ESC</span>
+      </div>
+      <div class="cmd-list" id="cmdPaletteList"></div>
+    </div>
   </div>
 
   <!-- Güncelleme Bildirimi Popup Modalı -->

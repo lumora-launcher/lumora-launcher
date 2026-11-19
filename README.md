@@ -7,12 +7,13 @@
   <h1>Lumora Launcher</h1>
   <p><strong>Modern, fast, and 100% open-source Minecraft Launcher — Built with Electron</strong></p>
   <p>
-    <img src="https://img.shields.io/badge/version-v1.2.2--beta-orange?style=for-the-badge" alt="Version" />
+    <img src="https://img.shields.io/badge/version-v1.3.0-20d6a8?style=for-the-badge" alt="Version" />
     <img src="https://img.shields.io/badge/license-MIT-20d6a8?style=for-the-badge" alt="MIT License" />
     <img src="https://img.shields.io/badge/platform-Windows%20x64-7c5cff?style=for-the-badge" alt="Windows x64" />
     <img src="https://img.shields.io/badge/languages-7%20(TR%20|%20EN%20|%20DE%20|%20ES%20|%20RU%20|%20FR%20|%20PT)-38bdf8?style=for-the-badge" alt="7 Languages" />
   </p>
   <p>
+    <a href="https://lumora-launcher.github.io/lumora-launcher/">🌐 Official Website</a> ·
     <a href="https://github.com/lumora-launcher/lumora-launcher/releases">⬇ Download Releases</a> ·
     <a href="#-english">🇬🇧 English</a> ·
     <a href="#-türkçe">🇹🇷 Türkçe</a> ·
@@ -102,6 +103,9 @@
 - **🌐 Live Server List & QuickPlay:** Inspect real-time server MOTD, icon, ping (ms), and player counts via Minecraft SLP, and join directly skipping the main menu.
 - **🌍 World Manager, ZIP Backups & Screenshot Gallery:** Launch directly into singleplayer worlds, create/restore `.zip` backups, and browse in-game `F2` screenshots.
 - **🔐 Microsoft (Xbox Live) & Offline Auth:** Sign in with your official Microsoft account (encrypted locally via Windows DPAPI `safeStorage`) or play in offline mode with model/UUID parity support.
+- **🩺 Pre-Launch Mod & Dependency Doctor:** Scans `.jar` metadata (`fabric.mod.json`, `mods.toml`, `neoforge.mods.toml`) before launching to catch missing dependencies (such as *Fabric API* or *Cloth Config*) and version mismatches with 1-click Modrinth search.
+- **📸 Screenshot (`F2`) Clipboard Copy & Preview:** Click any in-game screenshot for full-screen preview or copy the image directly to your clipboard to paste straight into Discord (`Ctrl+V`).
+- **⌨️ `Ctrl + K` Command Palette:** Jump to any profile, switch themes, run Mod Doctor, or search Modrinth instantly from anywhere via keyboard.
 - **🔍 Smart Crash Analyzer & `mclo.gs` Log Share:** Detects missing library mods, Java mismatches, Mixin conflicts, or RAM limits in `latest.log` / `crash-reports`, and uploads token-redacted logs to `mclo.gs`.
 - **🌍 7 Built-in Languages + OS Auto-Detection:** Automatically matches your OS language on first launch with instant switching between **🇹🇷 Türkçe**, **🇬🇧 English**, **🇩🇪 Deutsch**, **🇪🇸 Español**, **🇷🇺 Русский**, **🇫🇷 Français**, and **🇧🇷 Português** across every page and card.
 - **🎨 Customizable UI:** 5 color themes (*Aurora*, *Emerald*, *Nether*, *Cyberpunk*, *Frost*), 3 layouts (*Modern Cards*, *Cinematic Dock*, *Minimal Focus*), animated splash intro, and JVM optimization presets (*Aikar's Flags*, *Low-End*).
@@ -131,16 +135,18 @@ npm.cmd run dist:beta     # Beta build (Lumora-Launcher-Beta-Setup-x.x.x-beta.ex
 
 ## 🇹🇷 Türkçe
 
-### ✨ Neler Var? (v1.2.2-beta)
+### ✨ Neler Var? (v1.3.0 Tam Sürüm)
 
 - **🗂️ İzole Profil (Instance) Yönetimi:** Ana oyun klasörünü bozmadan **Fabric**, **NeoForge**, **OptiFine**, **Forge**, **Quilt** ve **Vanilla** profillerini birbirinden bağımsız `mods`, `saves`, `shaderpacks` ve `config` klasörlerinde tut; tek tıkla **Profili Çoğalt**, **Ad & Simge Düzenle**, profile özel RAM seç ve ana sürümü otomatik denetle.
+- **🩺 Oyun Öncesi Mod & Bağımlılık Doktoru:** Oyuna girmeden önce `.jar` mod dosyalarının içini tarar; eksik bir kütüphane (*Fabric API*, *Cloth Config* vb.) veya uyumsuz Minecraft sürümü varsa çökmeden uyarır.
+- **⌨️ `Ctrl + K` Hızlı Komut & Arama Paleti:** Launcher'ın herhangi bir yerinden profil değiştir, Modrinth'te ara, tema değiştir veya Mod Doktoru'nu başlat.
 - **📦 Evrensel Sürükle-Bırak Kurulumu:** Pencerenin herhangi bir yerine `.jar` mod, `.zip` shader/kaynak paketi veya `.mrpack` modpack dosyası sürükleyip bırakarak aktif profile otomatik kur.
 - **🟢 Modrinth İçerik Mağazası & `.mrpack` Desteği:** Tarayıcıya ihtiyaç duymadan **Mod**, **Modpack (`.mrpack`)**, **Shader** ve **Kaynak Paketi** ara, gerekli bağımlılıklarıyla (*Fabric API* vb.) birlikte tek tıkla kur ve `.mrpack` içe/dışa aktar.
 - **📥 Başka Launcher'dan Profil Göçü:** Mevcut `.minecraft`, **CurseForge**, **Prism Launcher**, **MultiMC** ve **Modrinth App** profillerini tek tıkla Lumora'ya kopyala.
 - **👕 Dahili 3B Skin & Karakter Stüdyosu (Steve 4px & Alex 3px):** Resmi Mojang API sorgusu, otomatik **Alex (3px ince kol)** / **Steve (4px klasik kol)** 3B çizim, eski `64×32` şapka siyahlığı düzeltmesi, bilgisayardan özel `.png` seçme, tek tıkla `CustomSkinLoader` kurulumu ve Microsoft hesabına doğrudan skin yükleme.
 - **⚙️ Uygulama İçi Config Düzenleyici & Önbellek Temizleyici:** Profilin `options.txt` ve `config/` dosyalarını arayüzden düzenle; tek tıkla geçici Forge/OptiFine kurulum önbelleğini temizle.
 - **🌐 Canlı Sunucu Listesi & Tek Tıkla Bağlan (`QuickPlay`):** Sunucuların canlı oyuncu sayısını, ping (ms) süresini ve MOTD açıklamasını gör; tek tıkla doğrudan bağlan.
-- **🌍 Dünya (`saves`) Yöneticisi, ZIP Yedekleme & Ekran Görüntüleri:** Tek oyunculu dünyalarını `.zip` olarak yedekle/geri yükle ve `F2` ekran görüntülerini galeriden incele.
+- **🌍 Dünya (`saves`) Yöneticisi, ZIP Yedekleme & Ekran Görüntüsü Panosu (`F2`):** Tek oyunculu dünyalarını `.zip` olarak yedekle/geri yükle; oyun içi `F2` ekran görüntülerini büyütüp tek tıkla Discord için panoya kopyala.
 - **🔐 Microsoft (Xbox Live) & Çevrimdışı Hesap Desteği:** Resmi Microsoft oturumları Windows DPAPI (`safeStorage`) ile şifrelenerek saklanır.
 - **🔍 Akıllı Çökme Analizcisi & `mclo.gs` Log Paylaşımı:** Çökme sebeplerini açıklar ve token bilgileri gizlenmiş logu tek tıkla `mclo.gs`'e yükler.
 - **🌍 Tam Kapsamlı 7 Dil Desteği + Otomatik Dil Algılama:** İlk açılışta sistem dilini otomatik algılar; **🇹🇷 Türkçe**, **🇬🇧 English**, **🇩🇪 Deutsch**, **🇪🇸 Español**, **🇷🇺 Русский**, **🇫🇷 Français**, **🇧🇷 Português** arasında tüm kartlar ve ayarlarla anında geçiş yap.
