@@ -54,6 +54,34 @@ const LOADER_ICONS = {
   optifine: '⚡'
 };
 
+const CUSTOM_ICONS = {
+  grass: '🟩',
+  fabric: '🧵',
+  quilt: '🟪',
+  forge: '⚒️',
+  neoforge: '🦊',
+  optifine: '⚡',
+  diamond: '💎',
+  sword: '⚔️',
+  fire: '🔥',
+  crown: '👑',
+  rocket: '🚀',
+  vanilla: '🟩'
+};
+
+function getInstIcon(inst) {
+  if (!inst) return '🟩';
+  return CUSTOM_ICONS[inst.icon] || LOADER_ICONS[inst.loader] || '🟩';
+}
+
+function i18nT(key) {
+  return window.LumoraI18n ? window.LumoraI18n.t(key) : key;
+}
+
+function i18nFmt(key, vars) {
+  return window.LumoraI18n && window.LumoraI18n.fmt ? window.LumoraI18n.fmt(key, vars) : i18nT(key);
+}
+
 // ---------------- Yardımcılar ----------------
 function toast(msg, isError = false) {
   const t = $('toast');
@@ -716,11 +744,11 @@ function validateUsername() {
     const hasAcc = savedMsAccounts.length > 0;
     const msHint = $('msAccountHint');
     if (!hasAcc) {
-      msHint.textContent = 'Oyuna girmek için "+ Microsoft Girişi" butonuna tıklayın veya Çevrimdışı moda geçin.';
+      msHint.textContent = i18nT('hint_ms_need');
       msHint.className = 'hint error';
       return false;
     }
-    msHint.textContent = 'Orijinal Microsoft (Xbox Live) oturumu hazır ✓';
+    msHint.textContent = i18nT('hint_ms_ok');
     msHint.className = 'hint ok';
     return true;
   }
@@ -728,16 +756,16 @@ function validateUsername() {
   const v = $('username').value.trim();
   const hint = $('usernameHint');
   if (!v) {
-    hint.textContent = '3-16 karakter, harf, rakam ve _';
+    hint.textContent = i18nT('hint_user_default');
     hint.className = 'hint';
     return false;
   }
   if (!USERNAME_RE.test(v)) {
-    hint.textContent = 'Sadece harf, rakam ve _ (3-16 karakter)';
+    hint.textContent = i18nT('hint_user_invalid');
     hint.className = 'hint error';
     return false;
   }
-  hint.textContent = 'Kullanıcı adı uygun ✓';
+  hint.textContent = i18nT('hint_user_ok');
   hint.className = 'hint ok';
   return true;
 }
@@ -777,7 +805,7 @@ function renderInstanceSelectors() {
   mrSel.innerHTML = '';
 
   for (const inst of instances) {
-    const label = `${LOADER_ICONS[inst.loader] || '🟩'} ${inst.name} (${LOADER_LABELS[inst.loader]} ${inst.mcVersion})`;
+    const label = `${getInstIcon(inst)} ${inst.name} (${LOADER_LABELS[inst.loader]} ${inst.mcVersion})`;
     const o1 = document.createElement('option');
     o1.value = inst.id;
     o1.textContent = label;
@@ -822,14 +850,14 @@ function renderInstanceCards() {
     const card = document.createElement('div');
     card.className = `inst-card${inst.id === activeInstanceId ? ' active' : ''}`;
     const playMins = Math.round((inst.playTimeMs || 0) / 60000);
-    const playText = playMins > 0 ? `${playMins} dk oynandı` : 'Henüz oynanmadı';
+    const playText = playMins > 0 ? i18nFmt('lbl_mins_played', { n: playMins }) : i18nT('lbl_never_played');
     const baseTag = inst.baseInstalled
-      ? `<span class="inst-tag" style="background:rgba(32,214,168,0.14);color:var(--accent-2)">✓ Ana Sürüm Hazır</span>`
-      : `<span class="inst-tag" style="background:rgba(255,184,77,0.16);color:#ffb84d">⬇ Ana Sürüm İndirilecek</span>`;
+      ? `<span class="inst-tag" style="background:rgba(32,214,168,0.14);color:var(--accent-2)">${i18nT('lbl_base_ready')}</span>`
+      : `<span class="inst-tag" style="background:rgba(255,184,77,0.16);color:#ffb84d">${i18nT('lbl_base_dl')}</span>`;
 
     card.innerHTML = `
       <div class="inst-card-top">
-        <div class="inst-avatar">${LOADER_ICONS[inst.loader] || '🟩'}</div>
+        <div class="inst-avatar">${getInstIcon(inst)}</div>
         <div class="inst-meta">
           <h4></h4>
           <div class="inst-tags">
@@ -840,10 +868,10 @@ function renderInstanceCards() {
         </div>
       </div>
       <div class="inst-card-foot">
-        <span>${inst.modsCount || 0} Mod · ${inst.shadersCount || 0} Shader · ${playText}</span>
+        <span>${inst.modsCount || 0} ${i18nT('lbl_mods_short')} · ${inst.shadersCount || 0} ${i18nT('lbl_shaders_short')} · ${playText}</span>
         <div class="inst-card-btns">
-          <button class="icon-btn" data-act="folder" title="Profil Klasörünü Aç">📁</button>
-          <button class="icon-btn danger" data-act="delete" title="Profili Sil">🗑</button>
+          <button class="icon-btn" data-act="folder" title="${i18nT('btn_open_folder')}">📁</button>
+          <button class="icon-btn danger" data-act="delete" title="✕">🗑</button>
         </div>
       </div>
     `;
@@ -881,20 +909,23 @@ async function renderActiveInstanceDetails() {
   const inst = getActiveInstance();
   if (!inst) return;
 
-  $('detailInstName').textContent = `${inst.name} — Kurulu İçerikler`;
+  $('detailInstName').textContent = `${getInstIcon(inst)} ${inst.name} — ${i18nT('lbl_detail_installed')}`;
   $('detailInstBadge').textContent = `${LOADER_LABELS[inst.loader]} ${inst.mcVersion}`;
-  $('detailInstPath').textContent = `İzole Klasör: ${inst.dir}`;
+  $('detailInstPath').textContent = `${i18nT('lbl_iso_dir')}: ${inst.dir}`;
   $('instRamSelect').value = String(inst.ramMax || 0);
   $('btnInstallFpsPack').style.display = inst.loader === 'fabric' || inst.loader === 'quilt' ? 'inline-block' : 'none';
+
+  const dropTarget = $('dropOverlayTarget');
+  if (dropTarget) dropTarget.textContent = i18nFmt('drop_hint', { name: inst.name });
 
   const baseBadge = $('detailBaseStatusBadge');
   const prepBtn = $('btnPrepareBaseVersion');
   if (inst.baseInstalled) {
-    baseBadge.textContent = `✓ Ana Sürüm (${inst.mcVersion}) Kurulu`;
+    baseBadge.textContent = i18nFmt('lbl_base_installed_badge', { ver: inst.mcVersion });
     baseBadge.className = 'badge ok-badge';
     prepBtn.classList.add('hidden');
   } else {
-    baseBadge.textContent = `⚠ Ana Sürüm (${inst.mcVersion}) Kurulu Değil`;
+    baseBadge.textContent = i18nFmt('lbl_base_missing_badge', { ver: inst.mcVersion });
     baseBadge.className = 'badge warn-badge';
     prepBtn.classList.remove('hidden');
   }
@@ -933,10 +964,7 @@ async function renderActiveInstanceDetails() {
   if (!items.length) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
-    empty.textContent =
-      currentContentTab === 'mod'
-        ? 'Bu profilde henüz kurulu mod yok. "+ Modrinth\'ten Ekle" veya "⚡ Tek Tıkla FPS Paketi Kur" butonunu kullanabilirsin.'
-        : 'Bu kategoride henüz kurulu paket bulunmuyor.';
+    empty.textContent = currentContentTab === 'mod' ? i18nT('empty_mods') : i18nT('empty_other_pkg');
     listEl.appendChild(empty);
     return;
   }
@@ -955,7 +983,7 @@ async function renderActiveInstanceDetails() {
         }
         <div class="installed-info">
           <strong></strong>
-          <span>${item.versionNumber ? `Sürüm: ${item.versionNumber} · ` : ''}${item.baseName} (${sizeKb} KB)</span>
+          <span>${item.versionNumber ? `${i18nT('lbl_version_pfx')}: ${item.versionNumber} · ` : ''}${item.baseName} (${sizeKb} KB)</span>
         </div>
       </div>
       <div class="installed-actions">
@@ -1081,6 +1109,47 @@ $('instRamSelect').onchange = async (e) => {
   await refreshInstances();
 };
 
+// Profil Adı & Simge Düzenleme (Inline Strip)
+let editingInstIcon = 'grass';
+document.querySelectorAll('#editInstIconGroup .chip').forEach((chip) => {
+  chip.onclick = () => {
+    document.querySelectorAll('#editInstIconGroup .chip').forEach((c) => c.classList.remove('active'));
+    chip.classList.add('active');
+    editingInstIcon = chip.dataset.icon || 'grass';
+  };
+});
+
+$('btnRenameInstance').onclick = () => {
+  const inst = getActiveInstance();
+  if (!inst) return;
+  const box = $('renameInstanceBox');
+  const willOpen = box.classList.contains('hidden');
+  box.classList.toggle('hidden');
+  if (willOpen) {
+    $('editInstNameInput').value = inst.name || '';
+    editingInstIcon = inst.icon || (inst.loader === 'vanilla' ? 'grass' : inst.loader) || 'grass';
+    document.querySelectorAll('#editInstIconGroup .chip').forEach((c) => {
+      c.classList.toggle('active', c.dataset.icon === editingInstIcon);
+    });
+    $('editInstNameInput').focus();
+  }
+};
+
+$('btnCancelInstMeta').onclick = () => {
+  $('renameInstanceBox').classList.add('hidden');
+};
+
+$('btnSaveInstMeta').onclick = async () => {
+  const inst = getActiveInstance();
+  if (!inst) return;
+  const newName = $('editInstNameInput').value.trim().slice(0, 40);
+  if (!newName) return toast(i18nT('inst_need_name'), true);
+  await window.api.updateInstance({ id: inst.id, name: newName, icon: editingInstIcon });
+  $('renameInstanceBox').classList.add('hidden');
+  toast(i18nT('inst_updated'));
+  await refreshInstances();
+};
+
 // Başka Launcher'dan Profil Göçü (Import Wizard)
 $('btnShowImportWizard').onclick = async () => {
   $('importWizardBox').classList.remove('hidden');
@@ -1153,8 +1222,7 @@ async function renderWorldsTab(inst, container) {
   const { worlds, backups } = await window.api.listWorlds({ instanceId: inst.id });
 
   if (!worlds.length && !backups.length) {
-    container.innerHTML =
-      '<div class="empty-state">Bu profilde henüz oluşturulmuş bir tek oyunculu dünya (saves) veya yedek bulunmuyor.</div>';
+    container.innerHTML = `<div class="empty-state">${i18nT('empty_worlds')}</div>`;
     return;
   }
 
@@ -1162,20 +1230,20 @@ async function renderWorldsTab(inst, container) {
     const row = document.createElement('div');
     row.className = 'installed-item';
     const mb = (w.sizeBytes / 1024 / 1024).toFixed(1);
-    const dateStr = new Date(w.lastModified).toLocaleDateString('tr-TR');
+    const dateStr = new Date(w.lastModified).toLocaleDateString();
 
     row.innerHTML = `
       <div class="installed-left">
         ${w.iconData ? `<img class="installed-icon" src="${w.iconData}" alt="" />` : `<div class="installed-icon">🌍</div>`}
         <div class="installed-info">
           <strong></strong>
-          <span>Boyut: ${mb} MB · Son oynama: ${dateStr}</span>
+          <span>${i18nT('lbl_world_size')}: ${mb} MB · ${i18nT('lbl_world_last')}: ${dateStr}</span>
         </div>
       </div>
       <div class="installed-actions">
-        <button class="ghost-btn accent-border" data-play-world="${w.folderName}">▶ Bu Dünyaya Gir</button>
-        <button class="ghost-btn" data-backup-world="${w.folderName}">💾 ZIP Yedekle</button>
-        <button class="icon-btn danger" data-del-world="${w.folderName}" title="Dünyayı Sil">🗑</button>
+        <button class="ghost-btn accent-border" data-play-world="${w.folderName}">${i18nT('btn_play_world')}</button>
+        <button class="ghost-btn" data-backup-world="${w.folderName}">${i18nT('btn_backup_world')}</button>
+        <button class="icon-btn danger" data-del-world="${w.folderName}" title="✕">🗑</button>
       </div>
     `;
     row.querySelector('strong').textContent = w.folderName;
@@ -1183,15 +1251,14 @@ async function renderWorldsTab(inst, container) {
     row.querySelector('[data-play-world]').onclick = () => launchWithQuickPlay({ world: w.folderName });
     row.querySelector('[data-backup-world]').onclick = async (e) => {
       e.target.disabled = true;
-      e.target.textContent = 'Yedekleniyor...';
+      e.target.textContent = i18nT('btn_backing_up');
       const r = await window.api.backupWorld({ instanceId: inst.id, folderName: w.folderName });
-      if (r.ok) toast(`Yedek oluşturuldu: ${r.zipName}`);
+      if (r.ok) toast(`ZIP: ${r.zipName}`);
       else toast(r.error, true);
       await renderActiveInstanceDetails();
     };
     row.querySelector('[data-del-world]').onclick = async () => {
       await window.api.deleteWorld({ instanceId: inst.id, folderName: w.folderName });
-      toast(`"${w.folderName}" dünyası silindi`);
       await renderActiveInstanceDetails();
     };
     container.appendChild(row);
@@ -1200,7 +1267,7 @@ async function renderWorldsTab(inst, container) {
   if (backups.length) {
     const head = document.createElement('div');
     head.style.cssText = 'font-size:12px;font-weight:700;color:var(--accent-2);margin:10px 0 4px';
-    head.textContent = `📦 Kayıtlı Dünya Yedekleri (${backups.length})`;
+    head.textContent = i18nFmt('lbl_world_backups', { n: backups.length });
     container.appendChild(head);
 
     for (const b of backups) {
@@ -1212,17 +1279,17 @@ async function renderWorldsTab(inst, container) {
           <div class="installed-icon">🗜</div>
           <div class="installed-info">
             <strong></strong>
-            <span>Yedek Arşivi · ${mb} MB</span>
+            <span>${i18nT('lbl_backup_archive')} · ${mb} MB</span>
           </div>
         </div>
         <div class="installed-actions">
-          <button class="ghost-btn" data-restore="${b.fileName}">↩ Geri Yükle</button>
+          <button class="ghost-btn" data-restore="${b.fileName}">${i18nT('btn_restore_backup')}</button>
         </div>
       `;
       row.querySelector('strong').textContent = b.fileName;
       row.querySelector('[data-restore]').onclick = async () => {
         const r = await window.api.restoreWorld({ instanceId: inst.id, backupFileName: b.fileName });
-        if (r.ok) toast('Dünya yedeği başarıyla geri yüklendi! ✓');
+        if (r.ok) toast('✓');
         else toast(r.error, true);
         await renderActiveInstanceDetails();
       };
@@ -1235,8 +1302,7 @@ async function renderWorldsTab(inst, container) {
 async function renderScreenshotsTab(inst, container) {
   const shots = await window.api.listScreenshots({ instanceId: inst.id });
   if (!shots.length) {
-    container.innerHTML =
-      '<div class="empty-state">Bu profilde henüz çekilmiş bir ekran görüntüsü (F2) bulunmuyor.</div>';
+    container.innerHTML = `<div class="empty-state">${i18nT('empty_screenshots')}</div>`;
     return;
   }
 
@@ -1261,8 +1327,7 @@ let editingConfigState = null;
 async function renderConfigsTab(inst, container) {
   const files = await window.api.listConfigs({ instanceId: inst.id });
   if (!files || !files.length) {
-    container.innerHTML =
-      '<div class="empty-state">Bu profilde henüz <code>options.txt</code> veya <code>config/</code> ayar dosyası yok. Oyun bir kez başlatıldığında otomatik oluşur.</div>';
+    container.innerHTML = `<div class="empty-state">${i18nT('empty_configs')}</div>`;
     return;
   }
 
@@ -1270,23 +1335,23 @@ async function renderConfigsTab(inst, container) {
     const row = document.createElement('div');
     row.className = 'installed-item';
     const sizeKb = Math.max(1, Math.round((f.size || 0) / 1024));
-    const dateStr = f.mtime ? new Date(f.mtime).toLocaleDateString('tr-TR') : '';
+    const dateStr = f.mtime ? new Date(f.mtime).toLocaleDateString() : '';
     row.innerHTML = `
       <div class="installed-left">
         <div class="installed-icon">⚙️</div>
         <div class="installed-info">
           <strong></strong>
-          <span>${sizeKb} KB${dateStr ? ` · Güncelleme: ${dateStr}` : ''}</span>
+          <span>${sizeKb} KB${dateStr ? ` · ${i18nT('lbl_updated_on')}: ${dateStr}` : ''}</span>
         </div>
       </div>
       <div class="installed-actions">
-        <button class="ghost-btn accent-border" data-edit-cfg>✏️ Düzenle</button>
+        <button class="ghost-btn accent-border" data-edit-cfg>${i18nT('btn_edit_cfg')}</button>
       </div>
     `;
     row.querySelector('strong').textContent = f.relPath;
     row.querySelector('[data-edit-cfg]').onclick = async () => {
       const res = await window.api.readConfigFile({ instanceId: inst.id, relPath: f.relPath });
-      if (!res.ok) return toast(res.error || 'Dosya okunamadı', true);
+      if (!res.ok) return toast(res.error || 'Error', true);
       editingConfigState = { instanceId: inst.id, relPath: f.relPath };
       $('configEditorTitle').textContent = `${inst.name} — ${f.relPath}`;
       $('configEditorTextarea').value = res.content;
@@ -1312,8 +1377,8 @@ $('btnConfigSave').onclick = async () => {
     content: $('configEditorTextarea').value
   });
   btn.disabled = false;
-  if (!res.ok) return toast(res.error || 'Dosya kaydedilemedi', true);
-  toast(`Kaydedildi: ${editingConfigState.relPath} ✓`);
+  if (!res.ok) return toast(res.error || 'Error', true);
+  toast(`${editingConfigState.relPath} ✓`);
   editingConfigState = null;
   $('configEditorModal').classList.add('hidden');
   await renderActiveInstanceDetails();
@@ -1324,13 +1389,12 @@ $('btnPrepareBaseVersion').onclick = async () => {
   if (!inst) return;
   const btn = $('btnPrepareBaseVersion');
   btn.disabled = true;
-  btn.textContent = `⏳ ${inst.mcVersion} İndiriliyor...`;
-  toast(`Ana sürüm (${inst.mcVersion}) indiriliyor, lütfen bekleyin...`);
+  btn.textContent = i18nFmt('btn_prep_busy', { ver: inst.mcVersion });
   const res = await window.api.ensureBaseVersion(inst.mcVersion);
   btn.disabled = false;
-  btn.textContent = '⬇ Ana Sürümü Şimdi İndir';
+  btn.textContent = i18nT('btn_prep_base');
   if (!res.ok) return toast(res.error, true);
-  toast(`Minecraft ${inst.mcVersion} ana sürümü başarıyla indirildi! ✓`);
+  toast(`Minecraft ${inst.mcVersion} ✓`);
   await refreshInstances();
 };
 
@@ -1387,18 +1451,20 @@ $('btnCheckModUpdates').onclick = async () => {
 };
 
 // ---------------- Modrinth Mağazası Arama & Kurulum (Geniş Havuz + Sayfalama) ----------------
+let lastModrinthHits = [];
+
 function updateModrinthFilterBadge() {
   const inst = getActiveInstance();
   if (!inst) return;
   const typeLabel =
     currentModrinthType === 'modpack'
-      ? 'Modpack (.mrpack — Yeni Profil Olarak Kurulur)'
+      ? i18nT('mr_tab_modpack')
       : currentModrinthType === 'shader'
-      ? 'Shader Paketi'
+      ? i18nT('mr_tab_shader')
       : currentModrinthType === 'resourcepack'
-      ? 'Kaynak Paketi'
+      ? i18nT('mr_tab_rp')
       : `Mod (${LOADER_LABELS[inst.loader]})`;
-  $('modrinthFilterBadge').textContent = `Aktif Profil: ${inst.name} · Minecraft ${inst.mcVersion} · Kategori: ${typeLabel}`;
+  $('modrinthFilterBadge').textContent = `${inst.name} · MC ${inst.mcVersion} · ${typeLabel}`;
 }
 
 document.querySelectorAll('#modrinthTypeTabs .sub-tab').forEach((tab) => {
@@ -1445,42 +1511,41 @@ function createModrinthCard(hit) {
           <div class="mr-author"></div>
         </div>
         <button class="mr-install-btn${isInstalled ? ' installed' : ''}" data-pid="${hit.project_id}">
-          ${isInstalled ? '✓ Kurulu' : 'İndir'}
+          ${isInstalled ? i18nT('btn_installed') : i18nT('btn_install')}
         </button>
       </div>
       <p class="mr-desc"></p>
       <div class="mr-foot">
-        <span>⬇ ${fmtNum(hit.downloads)} indirme</span>
+        <span>⬇ ${fmtNum(hit.downloads)} ${i18nT('lbl_downloads')}</span>
         <span>${(hit.categories || []).slice(0, 3).join(' · ')}</span>
       </div>
     </div>
   `;
   card.querySelector('.mr-title').textContent = hit.title;
-  card.querySelector('.mr-author').textContent = `Yazar: ${hit.author || 'Modrinth'}`;
+  card.querySelector('.mr-author').textContent = `${i18nT('lbl_author')}: ${hit.author || 'Modrinth'}`;
   card.querySelector('.mr-desc').textContent = hit.description || '';
 
   const btn = card.querySelector('.mr-install-btn');
   if (currentModrinthType === 'modpack') {
-    btn.textContent = 'Profil Olarak Kur';
+    btn.textContent = i18nT('btn_install_pack');
   }
   btn.onclick = async () => {
     if (currentModrinthType === 'modpack') {
       btn.disabled = true;
-      btn.textContent = 'Modpack Kuruluyor...';
-      toast(`${hit.title} modpack indiriliyor ve yeni profil hazırlanıyor...`);
+      btn.textContent = i18nT('btn_installing_pack');
       const res = await window.api.modrinthInstallModpack({
         projectId: hit.project_id,
         title: hit.title
       });
       if (!res.ok) {
         btn.disabled = false;
-        btn.textContent = 'Profil Olarak Kur';
+        btn.textContent = i18nT('btn_install_pack');
         return toast(res.error, true);
       }
       activeInstanceId = res.instance.id;
       btn.className = 'mr-install-btn installed';
-      btn.textContent = '✓ Profil Oluşturuldu';
-      toast(`"${res.instance.name}" modpack profili hazır! 🎉`);
+      btn.textContent = i18nT('btn_pack_created');
+      toast(`${res.instance.name} ✓`);
       await refreshInstances();
       return;
     }
@@ -1488,14 +1553,11 @@ function createModrinthCard(hit) {
     const targetInst = getActiveInstance();
     if (!targetInst) return;
     if (currentModrinthType === 'mod' && (targetInst.loader === 'vanilla' || targetInst.loader === 'optifine')) {
-      toast(
-        `${LOADER_LABELS[targetInst.loader]} profiline mod kurulamaz! Lütfen üstten Fabric/Quilt/Forge profili seçin (OptiFine'a Shader ve Kaynak Paketi kurabilirsiniz).`,
-        true
-      );
+      toast(`${LOADER_LABELS[targetInst.loader]}: Fabric / Quilt / Forge / NeoForge`, true);
       return;
     }
     btn.disabled = true;
-    btn.textContent = 'İndiriliyor...';
+    btn.textContent = i18nT('btn_installing');
     const res = await window.api.modrinthInstall({
       instanceId: targetInst.id,
       projectId: hit.project_id,
@@ -1506,15 +1568,15 @@ function createModrinthCard(hit) {
     });
     if (!res.ok) {
       btn.disabled = false;
-      btn.textContent = 'İndir';
+      btn.textContent = i18nT('btn_install');
       toast(res.error, true);
       return;
     }
     installedProjectIds.add(hit.project_id);
     btn.className = 'mr-install-btn installed';
-    btn.textContent = '✓ Kuruldu';
-    const extra = res.files.length > 1 ? ` (+${res.files.length - 1} gerekli kütüphane)` : '';
-    toast(`${hit.title} kuruldu!${extra}`);
+    btn.textContent = i18nT('btn_just_installed');
+    const extra = res.files.length > 1 ? ` (+${res.files.length - 1})` : '';
+    toast(`${hit.title} ✓${extra}`);
     await refreshInstances();
   };
 
@@ -1531,11 +1593,12 @@ async function runModrinthSearch(append = false) {
 
   if (!append) {
     currentModrinthOffset = 0;
-    box.innerHTML = '<div class="empty-state" style="grid-column:span 2">Modrinth havuzu taranıyor...</div>';
+    lastModrinthHits = [];
+    box.innerHTML = `<div class="empty-state" style="grid-column:span 2">${i18nT('mr_scanning')}</div>`;
     loadMoreBtn.classList.add('hidden');
   } else {
     loadMoreBtn.disabled = true;
-    loadMoreBtn.textContent = '⏳ Yükleniyor...';
+    loadMoreBtn.textContent = i18nT('mr_loading');
   }
 
   try {
@@ -1553,10 +1616,11 @@ async function runModrinthSearch(append = false) {
     if (!append) box.innerHTML = '';
     const hits = data.hits || [];
     currentModrinthTotal = data.total_hits || hits.length;
+    lastModrinthHits = append ? lastModrinthHits.concat(hits) : hits;
 
     if (!append && hits.length === 0) {
-      box.innerHTML = `<div class="empty-state" style="grid-column:span 2">Bu sürüm (${inst.mcVersion}) ve filtre için sonuç bulunamadı.</div>`;
-      countBadge.textContent = '0 sonuç';
+      box.innerHTML = `<div class="empty-state" style="grid-column:span 2">${i18nFmt('mr_no_results', { ver: inst.mcVersion })}</div>`;
+      countBadge.textContent = i18nT('mr_zero');
       return;
     }
 
@@ -1565,20 +1629,26 @@ async function runModrinthSearch(append = false) {
     }
 
     currentModrinthOffset += hits.length;
-    countBadge.textContent = `${currentModrinthOffset} / ${fmtNum(currentModrinthTotal)} içerik gösteriliyor`;
+    countBadge.textContent = i18nFmt('mr_showing', {
+      shown: currentModrinthOffset,
+      total: fmtNum(currentModrinthTotal)
+    });
 
     if (currentModrinthOffset < currentModrinthTotal) {
       loadMoreBtn.classList.remove('hidden');
       loadMoreBtn.disabled = false;
-      loadMoreBtn.textContent = `Daha Fazla Göster (${currentModrinthOffset} / ${fmtNum(currentModrinthTotal)})`;
+      loadMoreBtn.textContent = i18nFmt('mr_load_more', {
+        shown: currentModrinthOffset,
+        total: fmtNum(currentModrinthTotal)
+      });
     } else {
       loadMoreBtn.classList.add('hidden');
     }
   } catch (err) {
     if (!append) {
-      box.innerHTML = `<div class="empty-state" style="grid-column:span 2">Modrinth bağlantı hatası: ${err.message}</div>`;
+      box.innerHTML = `<div class="empty-state" style="grid-column:span 2">Modrinth: ${err.message}</div>`;
     } else {
-      toast(`Daha fazla yüklenemedi: ${err.message}`, true);
+      toast(err.message, true);
     }
   }
 }
@@ -1607,7 +1677,7 @@ async function loadVersions() {
     renderVersionOptions();
     await onActiveInstanceChanged();
   } catch {
-    $('javaHint').textContent = 'Sürüm listesi alınamadı (çevrimdışı)';
+    $('javaHint').textContent = i18nT('java_offline_err');
     $('javaHint').className = 'hint error';
   }
 }
@@ -1641,15 +1711,15 @@ function checkJavaCompat() {
   if (!settings.javaPath) java = bestJavaFor(requiredJava);
 
   const loaderTxt = `${LOADER_LABELS[inst.loader]} ${inst.mcVersion}`;
-  const baseStatusTxt = inst.baseInstalled ? 'Ana sürüm hazır ✓' : 'Ana sürüm otomatik indirilecek';
+  const baseStatusTxt = inst.baseInstalled ? i18nT('java_base_ready') : i18nT('java_base_auto');
   if (!java) {
-    hint.textContent = `${loaderTxt} · ${baseStatusTxt} · Java ${requiredJava} indirilecek`;
+    hint.textContent = `${loaderTxt} · ${baseStatusTxt} · ${i18nFmt('java_will_dl', { n: requiredJava })}`;
     hint.className = 'hint warn';
   } else if (java.major < requiredJava) {
-    hint.textContent = `${loaderTxt} · Java ${requiredJava} istiyor, seçili: Java ${java.major}`;
+    hint.textContent = `${loaderTxt} · ${i18nFmt('java_mismatch', { req: requiredJava, cur: java.major })}`;
     hint.className = 'hint error';
   } else {
-    hint.textContent = `${loaderTxt} · ${baseStatusTxt} · Java ${java.major}${settings.javaPath ? '' : ' (oto)'} ✓`;
+    hint.textContent = `${loaderTxt} · ${baseStatusTxt} · Java ${java.major}${settings.javaPath ? '' : i18nT('java_oto')} ✓`;
     hint.className = inst.baseInstalled ? 'hint ok' : 'hint warn';
   }
   updateStats();
@@ -1661,7 +1731,7 @@ function renderJavaSelect() {
   sel.innerHTML = '';
   const auto = document.createElement('option');
   auto.value = '';
-  auto.textContent = 'Otomatik (sürüme göre en uygun Java)';
+  auto.textContent = i18nT('java_auto_opt');
   sel.appendChild(auto);
   for (const j of javaList) {
     const o = document.createElement('option');
@@ -1908,6 +1978,88 @@ $('btnBannerUpdate').onclick = () => {
 };
 $('btnBannerDismiss').onclick = () => $('updateBanner').classList.remove('show');
 $('autoUpdateCheck').addEventListener('change', (e) => persist({ autoUpdateCheck: e.target.checked }));
+$('receiveBetaUpdates').addEventListener('change', (e) => persist({ receiveBetaUpdates: e.target.checked }));
+
+// ---------------- İndirici Önbelleği Temizleyici ----------------
+$('btnClearCache').onclick = async () => {
+  const btn = $('btnClearCache');
+  btn.disabled = true;
+  const res = await window.api.clearCache();
+  btn.disabled = false;
+  if (!res || !res.ok) return toast((res && res.error) || 'Error', true);
+  if (res.freedBytes > 0) {
+    toast(i18nFmt('cache_cleared_fmt', { mb: res.freedMb }));
+  } else {
+    toast(i18nT('cache_already_clean'));
+  }
+};
+
+// ---------------- Evrensel Sürükle-Bırak Kurulumu (.jar / .zip / .mrpack) ----------------
+let dropDepth = 0;
+function hasDroppedFiles(e) {
+  return e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+}
+
+window.addEventListener('dragenter', (e) => {
+  if (!hasDroppedFiles(e)) return;
+  e.preventDefault();
+  dropDepth++;
+  const inst = getActiveInstance();
+  if ($('dropOverlayTarget') && inst) {
+    $('dropOverlayTarget').textContent = i18nFmt('drop_hint', { name: inst.name });
+  }
+  $('dropOverlay').classList.add('active');
+});
+
+window.addEventListener('dragover', (e) => {
+  if (!hasDroppedFiles(e)) return;
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+});
+
+window.addEventListener('dragleave', (e) => {
+  if (!hasDroppedFiles(e)) return;
+  dropDepth = Math.max(0, dropDepth - 1);
+  if (dropDepth === 0) {
+    $('dropOverlay').classList.remove('active');
+  }
+});
+
+window.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  dropDepth = 0;
+  $('dropOverlay').classList.remove('active');
+  const rawFiles = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
+  if (!rawFiles.length) return;
+
+  const paths = rawFiles
+    .map((f) => window.api.getPathForFile(f))
+    .filter((p) => /\.(jar|zip|mrpack)$/i.test(p));
+
+  if (!paths.length) {
+    return toast(i18nT('drop_no_valid'), true);
+  }
+
+  const inst = getActiveInstance();
+  toast(i18nT('drop_installing'));
+  const res = await window.api.installDroppedFiles(activeInstanceId, paths);
+  if (!res || !res.ok) {
+    return toast((res && res.error) || 'Error', true);
+  }
+  if (res.newInstanceId) {
+    activeInstanceId = res.newInstanceId;
+  }
+  await refreshInstances();
+
+  const packItem = (res.installed || []).find((x) => x.kind === 'mrpack' && x.instance);
+  if (packItem) {
+    toast(i18nFmt('drop_done_pack', { name: packItem.instance.name }));
+  } else if (res.installed && res.installed.length > 0) {
+    toast(i18nFmt('drop_done_mods', { n: res.installed.length, name: (inst && inst.name) || '' }));
+  } else {
+    toast(i18nT('drop_no_valid'), true);
+  }
+});
 
 // ---------------- Çökme Analizcisi Modalı & Manuel Log Analizi ----------------
 let lastMissingModId = null;
@@ -2230,18 +2382,18 @@ async function refreshServers() {
             <strong></strong>
             <span class="srv-addr"></span>
           </div>
-          <div class="srv-motd" data-srv-motd>Sunucu durumu sorgulanıyor...</div>
+          <div class="srv-motd" data-srv-motd>${i18nT('lbl_querying')}</div>
         </div>
       </div>
       <div class="srv-right">
         <div class="srv-stats">
           <span class="srv-players" data-srv-players>— / —</span>
-          <span class="srv-ping" data-srv-ping>Ping...</span>
+          <span class="srv-ping" data-srv-ping>${i18nT('lbl_pinging')}</span>
         </div>
         <button class="play-btn sm-btn" data-join="${srv.address}">
-          <span class="play-label">BAĞLAN ▶</span>
+          <span class="play-label">${i18nT('btn_join')}</span>
         </button>
-        <button class="icon-btn danger" data-del-srv="${srv.id}" title="Sunucuyu Sil">🗑</button>
+        <button class="icon-btn danger" data-del-srv="${srv.id}" title="${i18nT('srv_del_title')}">🗑</button>
       </div>
     `;
     card.querySelector('strong').textContent = srv.name;
@@ -2250,7 +2402,7 @@ async function refreshServers() {
     card.querySelector('[data-join]').onclick = () => launchWithQuickPlay({ server: srv.address });
     card.querySelector('[data-del-srv]').onclick = async () => {
       await window.api.deleteServer(srv.id);
-      toast(`${srv.name} listeden kaldırıldı`);
+      toast(i18nFmt('srv_removed', { name: srv.name }));
       refreshServers();
     };
 
@@ -2265,17 +2417,17 @@ async function refreshServers() {
       const iconEl = card.querySelector('[data-srv-icon]');
 
       if (st && st.online) {
-        motdEl.textContent = st.motd || `${srv.name} — Çevrimiçi`;
-        pEl.textContent = `${fmtNum(st.playersOnline)} / ${fmtNum(st.playersMax)} oyuncu`;
+        motdEl.textContent = st.motd || `${srv.name} — ${i18nT('lbl_online')}`;
+        pEl.textContent = `${fmtNum(st.playersOnline)} / ${fmtNum(st.playersMax)} ${i18nT('lbl_players')}`;
         pingEl.textContent = `● ${st.pingMs} ms`;
         pingEl.className = 'srv-ping';
         if (st.favicon) {
           iconEl.innerHTML = `<img class="srv-icon" src="${st.favicon}" alt="" />`;
         }
       } else {
-        motdEl.textContent = 'Sunucuya şu an ulaşılamıyor.';
-        pEl.textContent = 'Çevrimdışı';
-        pingEl.textContent = '● Kapalı';
+        motdEl.textContent = i18nT('lbl_srv_unreachable');
+        pEl.textContent = i18nT('lbl_offline_srv');
+        pingEl.textContent = i18nT('lbl_closed_srv');
         pingEl.className = 'srv-ping offline';
       }
     });
@@ -2286,7 +2438,7 @@ $('btnRefreshServers').onclick = () => refreshServers();
 $('btnAddServer').onclick = async () => {
   const name = $('newServerName').value.trim();
   const address = $('newServerAddress').value.trim();
-  if (!address) return toast('Lütfen geçerli bir sunucu IP veya adresi girin', true);
+  if (!address) return toast(i18nT('srv_need_addr'), true);
   await window.api.addServer({ name: name || address, address });
   $('newServerName').value = '';
   $('newServerAddress').value = '';
@@ -2370,6 +2522,39 @@ function applyActiveLanguage(lang) {
   if (badge && window.LumoraI18n) {
     badge.textContent = window.LumoraI18n.t(isMs ? 'pill_original' : 'pill_offline');
   }
+  const chPill = $('releaseChannelPill');
+  if (chPill) chPill.textContent = i18nT(sys && sys.isBeta ? 'ch_beta' : 'ch_stable');
+
+  if (versionData) {
+    validateUsername();
+    checkJavaCompat();
+    renderJavaSelect();
+    $('javaSelect').value = settings.javaPath || '';
+  }
+  if (instances && instances.length) {
+    renderInstanceCards();
+    renderActiveInstanceDetails();
+    updateModrinthFilterBadge();
+  }
+  if (lastModrinthHits && lastModrinthHits.length) {
+    const box = $('modrinthResults');
+    box.innerHTML = '';
+    for (const hit of lastModrinthHits) box.appendChild(createModrinthCard(hit));
+    $('modrinthCountBadge').textContent = i18nFmt('mr_showing', {
+      shown: currentModrinthOffset,
+      total: fmtNum(currentModrinthTotal)
+    });
+    const loadMoreBtn = $('btnModrinthLoadMore');
+    if (loadMoreBtn && !loadMoreBtn.classList.contains('hidden')) {
+      loadMoreBtn.textContent = i18nFmt('mr_load_more', {
+        shown: currentModrinthOffset,
+        total: fmtNum(currentModrinthTotal)
+      });
+    }
+  }
+  if ($('serversList') && $('serversList').children.length > 0) {
+    refreshServers();
+  }
 }
 
 $('titlebarLangSelect').addEventListener('change', (e) => {
@@ -2386,13 +2571,16 @@ $('titlebarLangSelect').addEventListener('change', (e) => {
 
   const isBeta = !!sys.isBeta;
   document.documentElement.setAttribute('data-channel', isBeta ? 'beta' : 'stable');
-  const chPill = $('releaseChannelPill');
-  if (chPill) chPill.textContent = isBeta ? '🧪 Beta Önizleme Sürümü' : '✓ Resmi Sürüm';
 
   $('appVersionBadge').textContent = `v${sys.appVersion}`;
   $('currentVerText').textContent = `v${sys.appVersion}`;
 
-  applyActiveLanguage(settings.language || 'tr');
+  const detectedLang =
+    window.LumoraI18n && window.LumoraI18n.detectSystemLanguage
+      ? window.LumoraI18n.detectSystemLanguage()
+      : 'tr';
+  const initialLang = settings.language || detectedLang;
+  applyActiveLanguage(initialLang);
   applyTheme(settings.theme || 'aurora');
   applyLayout(settings.layoutStyle || 'modern');
   $('animationsEnabled').checked = settings.animationsEnabled !== false;
@@ -2427,6 +2615,7 @@ $('titlebarLangSelect').addEventListener('change', (e) => {
   $('gameDir').value = settings.gameDir;
   $('jvmArgs').value = settings.jvmArgs || '';
   $('autoUpdateCheck').checked = settings.autoUpdateCheck !== false;
+  $('receiveBetaUpdates').checked = settings.receiveBetaUpdates !== false;
 
   updateResRow();
   checkNetworkStatus();

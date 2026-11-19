@@ -7,7 +7,7 @@
   <h1>Lumora Launcher</h1>
   <p><strong>Modern, fast, and 100% open-source Minecraft Launcher — Built with Electron</strong></p>
   <p>
-    <img src="https://img.shields.io/badge/version-v1.2.1--beta-orange?style=for-the-badge" alt="Version" />
+    <img src="https://img.shields.io/badge/version-v1.2.2--beta-orange?style=for-the-badge" alt="Version" />
     <img src="https://img.shields.io/badge/license-MIT-20d6a8?style=for-the-badge" alt="MIT License" />
     <img src="https://img.shields.io/badge/platform-Windows%20x64-7c5cff?style=for-the-badge" alt="Windows x64" />
     <img src="https://img.shields.io/badge/languages-7%20(TR%20|%20EN%20|%20DE%20|%20ES%20|%20RU%20|%20FR%20|%20PT)-38bdf8?style=for-the-badge" alt="7 Languages" />
@@ -93,18 +93,19 @@
 
 ### ✨ Key Features
 
-- **🗂️ Isolated Profile (Instance) Management:** Keep **Fabric**, **NeoForge**, **Forge**, **OptiFine**, **Quilt**, and **Vanilla** profiles completely separated with dedicated `mods`, `saves`, `shaderpacks`, and `config` directories — plus **1-Click Profile Duplication**, per-profile **RAM limits**, and automatic base Vanilla verification.
+- **🗂️ Isolated Profile (Instance) Management:** Keep **Fabric**, **NeoForge**, **Forge**, **OptiFine**, **Quilt**, and **Vanilla** profiles completely separated with dedicated `mods`, `saves`, `shaderpacks`, and `config` directories — plus **1-Click Profile Duplication**, **Name & Icon Editor**, per-profile **RAM limits**, and automatic base Vanilla verification.
+- **📦 Universal Drag & Drop Installer:** Drop `.jar` mods, `.zip` shaders/resource packs, or `.mrpack` modpacks anywhere into the launcher window to automatically inspect and install them into your active profile (or create a new profile for `.mrpack`).
 - **🟢 Integrated Modrinth Store & `.mrpack` Support:** Browse, search, and install **Mods**, **Modpacks (`.mrpack`)**, **Shaders**, and **Resource Packs** without leaving the launcher. Automatically installs required dependencies (*Fabric API*, *Cloth Config*, etc.), checks SHA-1 mod updates, and supports `.mrpack` import/export.
 - **📥 Launcher Import Wizard:** Migrate existing profiles, mods, and worlds from official `.minecraft`, **CurseForge**, **Prism Launcher**, **MultiMC**, and **Modrinth App** in one click.
 - **👕 Built-in 3D Canvas Skin Studio (Steve 4px & Alex 3px):** Live Mojang API lookup, automatic 3px slim (*Alex*) vs 4px classic (*Steve*) arm rendering, legacy `64×32` hat fix, local `.png` skin picker, **1-click `CustomSkinLoader` install**, `.png` download, and direct Microsoft skin upload.
-- **⚙️ In-App Config & `options.txt` Editor:** Edit `options.txt`, `optionsof.txt`, and mod `config/` files (`.json`, `.toml`, `.properties`, `.cfg`, `.yml`) right inside the launcher.
+- **⚙️ In-App Config Editor & Installer Cache Cleaner:** Edit `options.txt`, `optionsof.txt`, and mod `config/` files right inside the launcher, and clear temporary Forge/OptiFine installer caches safely in one click.
 - **🌐 Live Server List & QuickPlay:** Inspect real-time server MOTD, icon, ping (ms), and player counts via Minecraft SLP, and join directly skipping the main menu.
 - **🌍 World Manager, ZIP Backups & Screenshot Gallery:** Launch directly into singleplayer worlds, create/restore `.zip` backups, and browse in-game `F2` screenshots.
 - **🔐 Microsoft (Xbox Live) & Offline Auth:** Sign in with your official Microsoft account (encrypted locally via Windows DPAPI `safeStorage`) or play in offline mode with model/UUID parity support.
 - **🔍 Smart Crash Analyzer & `mclo.gs` Log Share:** Detects missing library mods, Java mismatches, Mixin conflicts, or RAM limits in `latest.log` / `crash-reports`, and uploads token-redacted logs to `mclo.gs`.
-- **🌍 7 Built-in Languages:** Instant switching from the title bar between **🇹🇷 Türkçe**, **🇬🇧 English**, **🇩🇪 Deutsch**, **🇪🇸 Español**, **🇷🇺 Русский**, **🇫🇷 Français**, and **🇧🇷 Português**.
+- **🌍 7 Built-in Languages + OS Auto-Detection:** Automatically matches your OS language on first launch with instant switching between **🇹🇷 Türkçe**, **🇬🇧 English**, **🇩🇪 Deutsch**, **🇪🇸 Español**, **🇷🇺 Русский**, **🇫🇷 Français**, and **🇧🇷 Português** across every page and card.
 - **🎨 Customizable UI:** 5 color themes (*Aurora*, *Emerald*, *Nether*, *Cyberpunk*, *Frost*), 3 layouts (*Modern Cards*, *Cinematic Dock*, *Minimal Focus*), animated splash intro, and JVM optimization presets (*Aikar's Flags*, *Low-End*).
-- **🔒 Silent Official Auto-Updater:** Locked strictly to the official `lumora-launcher/lumora-launcher` GitHub repository with SHA-512 verification and silent background installation.
+- **🔒 Silent Official Auto-Updater & Beta Toggle:** Locked strictly to the official `lumora-launcher/lumora-launcher` GitHub repository with SHA-512 verification, silent background installation, and an optional Beta/pre-release update toggle.
 
 ### 🧪 Separate Stable & Beta Channels
 
@@ -130,19 +131,20 @@ npm.cmd run dist:beta     # Beta build (Lumora-Launcher-Beta-Setup-x.x.x-beta.ex
 
 ## 🇹🇷 Türkçe
 
-### ✨ Neler Var? (v1.2.1-beta)
+### ✨ Neler Var? (v1.2.2-beta)
 
-- **🗂️ İzole Profil (Instance) Yönetimi:** Ana oyun klasörünü bozmadan **Fabric**, **NeoForge**, **OptiFine**, **Forge**, **Quilt** ve **Vanilla** profillerini birbirinden bağımsız `mods`, `saves`, `shaderpacks` ve `config` klasörlerinde tut; tek tıkla **Profili Çoğalt**, profile özel RAM seç ve ana sürümü otomatik denetle.
+- **🗂️ İzole Profil (Instance) Yönetimi:** Ana oyun klasörünü bozmadan **Fabric**, **NeoForge**, **OptiFine**, **Forge**, **Quilt** ve **Vanilla** profillerini birbirinden bağımsız `mods`, `saves`, `shaderpacks` ve `config` klasörlerinde tut; tek tıkla **Profili Çoğalt**, **Ad & Simge Düzenle**, profile özel RAM seç ve ana sürümü otomatik denetle.
+- **📦 Evrensel Sürükle-Bırak Kurulumu:** Pencerenin herhangi bir yerine `.jar` mod, `.zip` shader/kaynak paketi veya `.mrpack` modpack dosyası sürükleyip bırakarak aktif profile otomatik kur.
 - **🟢 Modrinth İçerik Mağazası & `.mrpack` Desteği:** Tarayıcıya ihtiyaç duymadan **Mod**, **Modpack (`.mrpack`)**, **Shader** ve **Kaynak Paketi** ara, gerekli bağımlılıklarıyla (*Fabric API* vb.) birlikte tek tıkla kur ve `.mrpack` içe/dışa aktar.
 - **📥 Başka Launcher'dan Profil Göçü:** Mevcut `.minecraft`, **CurseForge**, **Prism Launcher**, **MultiMC** ve **Modrinth App** profillerini tek tıkla Lumora'ya kopyala.
 - **👕 Dahili 3B Skin & Karakter Stüdyosu (Steve 4px & Alex 3px):** Resmi Mojang API sorgusu, otomatik **Alex (3px ince kol)** / **Steve (4px klasik kol)** 3B çizim, eski `64×32` şapka siyahlığı düzeltmesi, bilgisayardan özel `.png` seçme, tek tıkla `CustomSkinLoader` kurulumu ve Microsoft hesabına doğrudan skin yükleme.
-- **⚙️ Uygulama İçi Config & `options.txt` Düzenleyici:** Profilin `options.txt` ve `config/` altındaki (`.json`, `.toml`, `.properties`, `.cfg`, `.yml`) dosyalarını doğrudan arayüzden düzenle.
+- **⚙️ Uygulama İçi Config Düzenleyici & Önbellek Temizleyici:** Profilin `options.txt` ve `config/` dosyalarını arayüzden düzenle; tek tıkla geçici Forge/OptiFine kurulum önbelleğini temizle.
 - **🌐 Canlı Sunucu Listesi & Tek Tıkla Bağlan (`QuickPlay`):** Sunucuların canlı oyuncu sayısını, ping (ms) süresini ve MOTD açıklamasını gör; tek tıkla doğrudan bağlan.
 - **🌍 Dünya (`saves`) Yöneticisi, ZIP Yedekleme & Ekran Görüntüleri:** Tek oyunculu dünyalarını `.zip` olarak yedekle/geri yükle ve `F2` ekran görüntülerini galeriden incele.
 - **🔐 Microsoft (Xbox Live) & Çevrimdışı Hesap Desteği:** Resmi Microsoft oturumları Windows DPAPI (`safeStorage`) ile şifrelenerek saklanır.
-- **🔍 Akıllı Çökme Analizcisi & `mclo.gs` Log Paylaşımı:** Çökme sebeplerini Türkçe açıklar ve token bilgileri gizlenmiş logu tek tıkla `mclo.gs`'e yükler.
-- **🌍 7 Dil Desteği:** Üst başlıktan anında **🇹🇷 Türkçe**, **🇬🇧 English**, **🇩🇪 Deutsch**, **🇪🇸 Español**, **🇷🇺 Русский**, **🇫🇷 Français**, **🇧🇷 Português** arası geçiş yap.
-- **🧪 Normal & Beta Ayrı Kurulumlar:** Beta sürümleri altın-kehribar simgesi, `BETA` arayüz rozetleri ve ayrı Windows kurulum kimliğiyle (`com.lumora.launcher.beta`) normal sürümün üzerine yazmadan kurulur.
+- **🔍 Akıllı Çökme Analizcisi & `mclo.gs` Log Paylaşımı:** Çökme sebeplerini açıklar ve token bilgileri gizlenmiş logu tek tıkla `mclo.gs`'e yükler.
+- **🌍 Tam Kapsamlı 7 Dil Desteği + Otomatik Dil Algılama:** İlk açılışta sistem dilini otomatik algılar; **🇹🇷 Türkçe**, **🇬🇧 English**, **🇩🇪 Deutsch**, **🇪🇸 Español**, **🇷🇺 Русский**, **🇫🇷 Français**, **🇧🇷 Português** arasında tüm kartlar ve ayarlarla anında geçiş yap.
+- **🧪 Normal & Beta Ayrı Kurulumlar + Beta Kanal Tercihi:** Beta sürümleri altın-kehribar simgesi, `BETA` rozetleri, Güncellemeler sayfasındaki Beta güncelleme anahtarı ve ayrı Windows kurulum kimliğiyle (`com.lumora.launcher.beta`) normal sürümün üzerine yazmadan kurulur.
 
 ### 🛠️ Geliştirici Kurulumu (Normal & Beta)
 

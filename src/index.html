@@ -49,7 +49,7 @@
       </div>
       <span class="brand-name">Lumora</span>
       <span class="beta-pill" id="betaChannelBadge" title="Beta Önizleme Kanalı — Normal sürümden bağımsız kurulur">🧪 BETA</span>
-      <span class="version-pill" id="appVersionBadge" title="Güncellemeleri kontrol et">v1.2.1-beta</span>
+      <span class="version-pill" id="appVersionBadge" title="Güncellemeleri kontrol et">v1.2.2-beta</span>
     </div>
 
     <div class="titlebar-quick">
@@ -327,6 +327,7 @@
                 <option value="8192">RAM: 8 GB</option>
                 <option value="12288">RAM: 12 GB</option>
               </select>
+              <button class="ghost-btn" id="btnRenameInstance" title="Profil adını ve simgesini düzenle">✏️ Düzenle</button>
               <button class="ghost-btn" id="btnDuplicateInstance" title="Bu profili tüm modları ve ayarlarıyla kopyala">📋 Profili Çoğalt</button>
               <button class="ghost-btn hidden" id="btnPrepareBaseVersion" title="Bu profilin ihtiyaç duyduğu ana Minecraft sürümünü şimdi indir">⬇ Ana Sürümü Şimdi İndir</button>
               <button class="ghost-btn accent-border" id="btnInstallFpsPack" title="Sodium, Lithium, FerriteCore, EntityCulling kur">⚡ Tek Tıkla FPS Paketi Kur</button>
@@ -334,6 +335,34 @@
               <button class="ghost-btn" id="btnExportMrpack" title="Bu profili .mrpack modpack dosyası olarak dışa aktar">📤 .mrpack Dışa Aktar</button>
               <button class="ghost-btn" id="btnOpenInstModrinth">+ Modrinth'ten Ekle</button>
               <button class="ghost-btn" id="btnOpenInstFolder">Klasörü Aç</button>
+            </div>
+          </div>
+
+          <div class="rename-inst-box hidden" id="renameInstanceBox">
+            <div class="rename-row">
+              <div class="field" style="flex:1;margin:0">
+                <label for="editInstNameInput" id="lblEditInstName">Profil Adı</label>
+                <input id="editInstNameInput" maxlength="40" spellcheck="false" />
+              </div>
+              <div class="rename-actions">
+                <button type="button" class="play-btn sm-btn" id="btnSaveInstMeta"><span class="play-label" id="lblSaveInstMeta">KAYDET</span></button>
+                <button type="button" class="ghost-btn" id="btnCancelInstMeta">İptal</button>
+              </div>
+            </div>
+            <div class="icon-picker-row">
+              <span class="hint" id="lblEditInstIcon">Simge:</span>
+              <div class="icon-picker-pills" id="editInstIconGroup">
+                <button type="button" class="chip active" data-icon="grass">🟩</button>
+                <button type="button" class="chip" data-icon="fabric">🧵</button>
+                <button type="button" class="chip" data-icon="neoforge">🦊</button>
+                <button type="button" class="chip" data-icon="forge">⚒️</button>
+                <button type="button" class="chip" data-icon="optifine">⚡</button>
+                <button type="button" class="chip" data-icon="diamond">💎</button>
+                <button type="button" class="chip" data-icon="sword">⚔️</button>
+                <button type="button" class="chip" data-icon="fire">🔥</button>
+                <button type="button" class="chip" data-icon="crown">👑</button>
+                <button type="button" class="chip" data-icon="rocket">🚀</button>
+              </div>
             </div>
           </div>
 
@@ -675,6 +704,12 @@
               </div>
               <input id="jvmArgs" placeholder="-XX:+UseG1GC -XX:+UnlockExperimentalVMOptions" spellcheck="false" />
             </div>
+            <div class="field" style="margin-top:10px">
+              <div class="row-gap">
+                <button type="button" class="ghost-btn" id="btnClearCache" title="Forge / OptiFine kurulum önbelleğini temizleyerek disk alanı aç">🧹 Kurulum Önbelleğini Temizle</button>
+                <small class="hint" id="clearCacheHint">Geçici Forge/OptiFine kurulum dosyalarını siler, profillerine ve dünyalarına dokunmaz.</small>
+              </div>
+            </div>
           </div>
         </div>
         <div class="save-bar">
@@ -696,7 +731,7 @@
                 <div>
                   <div class="update-ver-line">
                     <h3>Lumora Launcher</h3>
-                    <span class="badge" id="currentVerText">v1.2.1-beta</span>
+                    <span class="badge" id="currentVerText">v1.2.2-beta</span>
                     <span class="verified-pill" id="releaseChannelPill">✓ Resmi Sürüm</span>
                   </div>
                   <p class="sub-sm" id="updateStatusTitle">Güncellemeler resmi GitHub sunucusu üzerinden otomatik denetlenir.</p>
@@ -755,6 +790,13 @@
                 <small class="hint">Yeni bir sürüm yayınlandığında üstte bildirim çubuğu gösterilir</small>
               </div>
               <label class="switch"><input type="checkbox" id="autoUpdateCheck" checked /><span></span></label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-title" id="betaUpdatesTitle">Beta & önizleme sürümlerini de denetle</div>
+                <small class="hint" id="betaUpdatesHint">Kapalıyken (Kararlı sürümde) yalnızca kararlı sürümler bildirilir</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="receiveBetaUpdates" checked /><span></span></label>
             </div>
             <div class="security-note">
               <svg viewBox="0 0 24 24"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4Zm-2 16-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8Z"/></svg>
@@ -884,6 +926,15 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="drop-overlay" id="dropOverlay">
+    <div class="drop-overlay-card">
+      <div class="drop-icon">📦</div>
+      <h3 id="dropOverlayTitle">Dosyayı Buraya Bırak</h3>
+      <p id="dropOverlaySub">.jar (Mod), .zip (Shader / Kaynak Paketi) veya .mrpack (Modpack) dosyalarını otomatik kur</p>
+      <span class="badge" id="dropOverlayTarget">Aktif profile kurulacak</span>
     </div>
   </div>
 

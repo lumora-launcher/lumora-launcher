@@ -61,7 +61,8 @@ function defaultSettings() {
     closeOnLaunch: true,
     minimizeToTray: true,
     discordRpc: true,
-    language: 'tr',
+    language: '',
+    receiveBetaUpdates: true,
     offlineSkinModel: 'classic', // 'classic' | 'slim'
     customSkinDataUrl: '',
     jvmArgs: '',
@@ -1648,7 +1649,11 @@ async function checkOfficialGithubRelease() {
     return { state: 'error', message: `GitHub sunucusuna ulaşılamadı (HTTP ${res.status})` };
   }
   const list = await res.json();
-  const validReleases = Array.isArray(list) ? list.filter((r) => !r.draft) : [];
+  const s = loadSettings();
+  const allowBeta = isBetaChannel() || s.receiveBetaUpdates !== false;
+  const validReleases = Array.isArray(list)
+    ? list.filter((r) => !r.draft && (allowBeta || !r.prerelease))
+    : [];
   if (!validReleases.length) {
     return {
       state: 'no-release',
@@ -3381,6 +3386,139 @@ ipcMain.handle('skin:uploadMicrosoft', async (_e, { variant } = {}) => {
     }
     skinLookupCache.delete(acc.name.toLowerCase());
     return { ok: true, accountName: acc.name };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+// ---------------- Sürükle-Bırak Akıllı İçerik Kurulumu (.jar / .zip / .mrpack) ----------------
+ipcMain.handle('instance:installDroppedFiles', async (_e, { instanceId, filePaths }) => {
+  try {
+    if (!Array.isArray(filePaths) || filePaths.length === 0) {
+      return { ok: false, error: 'Kurulacak dosya bulunamadı.' };
+    }
+    const instDir = getInstanceDir(instanceId || 'default-vanilla');
+    fs.mkdirSync(path.join(instDir, 'mods'), { recursive: true });
+    fs.mkdirSync(path.join(instDir, 'resourcepacks'), { recursive: true });
+    fs.mkdirSync(path.join(instDir, 'shaderpacks'), { recursive: true });
+
+    const meta = loadModMetaFile(instDir);
+    let metaChanged = false;
+    const installed = [];
+    const skipped = [];
+    let newInstanceId = null;
+
+    for (const rawPath of filePaths) {
+      if (!rawPath || typeof rawPath !== 'string') continue;
+      const fp = path.resolve(rawPath);
+      if (!fs.existsSync(fp)) {
+        skipped.push(path.basename(fp));
+        continue;
+      }
+      let st;
+      try {
+        st = fs.statSync(fp);
+      } catch {
+        skipped.push(path.basename(fp));
+        continue;
+      }
+      if (!st.isFile()) {
+        skipped.push(path.basename(fp));
+        continue;
+      }
+
+      const ext = path.extname(fp).toLowerCase();
+      const baseName = path.basename(fp);
+
+      if (ext === '.mrpack') {
+        const inst = await installMrpackArchive(fp);
+        newInstanceId = inst.id;
+        installed.push({ file: baseName, kind: 'mrpack', instance: inst });
+      } else if (ext === '.jar') {
+        const dest = path.join(instDir, 'mods', baseName);
+        fs.copyFileSync(fp, dest);
+        meta[baseName] = {
+          title: baseName.replace(/\.jar$/i, ''),
+          versionNumber: '',
+          installedAt: Date.now()
+        };
+        metaChanged = true;
+        installed.push({ file: baseName, kind: 'mod' });
+      } else if (ext === '.zip') {
+        let isShader = false;
+        try {
+          const zip = new AdmZip(fp);
+          const entries = zip.getEntries();
+          isShader = entries.some((e) => {
+            const norm = String(e.entryName || '').replace(/\\/g, '/').toLowerCase();
+            return norm.startsWith('shaders/') || norm.includes('/shaders/');
+          });
+        } catch {
+          isShader = /shader/i.test(baseName);
+        }
+        const folder = isShader ? 'shaderpacks' : 'resourcepacks';
+        const kind = isShader ? 'shader' : 'resourcepack';
+        fs.copyFileSync(fp, path.join(instDir, folder, baseName));
+        meta[baseName] = {
+          title: baseName.replace(/\.zip$/i, ''),
+          versionNumber: '',
+          installedAt: Date.now()
+        };
+        metaChanged = true;
+        installed.push({ file: baseName, kind });
+      } else {
+        skipped.push(baseName);
+      }
+    }
+
+    if (metaChanged) {
+      saveModMetaFile(instDir, meta);
+    }
+
+    return { ok: true, installed, skipped, newInstanceId };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+// ---------------- İndirici Önbelleği Temizleyici ----------------
+function calcDirSize(dirPath) {
+  let total = 0;
+  if (!fs.existsSync(dirPath)) return 0;
+  for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
+    const full = path.join(dirPath, entry.name);
+    try {
+      if (entry.isDirectory()) total += calcDirSize(full);
+      else if (entry.isFile()) total += fs.statSync(full).size;
+    } catch {
+      // okunamayan dosyayı yoksay
+    }
+  }
+  return total;
+}
+
+ipcMain.handle('cache:clear', () => {
+  try {
+    const s = loadSettings();
+    const dirs = [
+      path.join(s.gameDir, 'forge-installers'),
+      path.join(s.gameDir, 'optifine-installers')
+    ];
+    let freedBytes = 0;
+    for (const dir of dirs) {
+      if (!fs.existsSync(dir)) continue;
+      freedBytes += calcDirSize(dir);
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+      } catch {
+        // meşgul dosya varsa yoksay
+      }
+    }
+    return {
+      ok: true,
+      freedBytes,
+      freedMb: Number((freedBytes / 1024 / 1024).toFixed(2))
+    };
   } catch (err) {
     return { ok: false, error: err.message || String(err) };
   }

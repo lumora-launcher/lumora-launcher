@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const on = (channel) => (cb) => {
   const handler = (_e, data) => cb(data);
@@ -100,6 +100,11 @@ contextBridge.exposeInMainWorld('api', {
   onDownload: on('game:download'),
   onState: on('game:state'),
   onCrash: on('game:crash'),
+
+  // Sürükle-bırak & Önbellek
+  getPathForFile: (file) => (webUtils && webUtils.getPathForFile ? webUtils.getPathForFile(file) : (file && file.path) || ''),
+  installDroppedFiles: (instanceId, filePaths) => ipcRenderer.invoke('instance:installDroppedFiles', { instanceId, filePaths }),
+  clearCache: () => ipcRenderer.invoke('cache:clear'),
 
   // Güncelleme
   checkForUpdates: () => ipcRenderer.invoke('update:check'),
