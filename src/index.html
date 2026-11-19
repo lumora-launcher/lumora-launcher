@@ -742,8 +742,12 @@
                 <button class="play-btn sm-btn" id="btnCheckUpdate">
                   <span class="play-label">GÜNCELLEMELERİ DENETLE</span>
                 </button>
-                <button class="ghost-btn hidden" id="btnDownloadUpdate">İndir ve Kur</button>
-                <button class="ghost-btn hidden" id="btnInstallUpdate">Yeniden Başlat & Kur</button>
+                <button class="play-btn sm-btn hidden" id="btnDownloadUpdate">
+                  <span class="play-label">⬇ İNDİR VE KUR</span>
+                </button>
+                <button class="play-btn sm-btn hidden" id="btnInstallUpdate">
+                  <span class="play-label">🚀 YENİDEN BAŞLAT & KUR</span>
+                </button>
               </div>
             </div>
 
@@ -819,6 +823,51 @@
         <pre class="console glass" id="console"></pre>
       </section>
     </main>
+  </div>
+
+  <!-- Güncelleme Bildirimi Popup Modalı -->
+  <div class="modal-backdrop hidden" id="updatePopupModal">
+    <div class="modal-card modal-update glass">
+      <div class="modal-head update-popup-head">
+        <div class="update-popup-title-row">
+          <div class="update-popup-icon">🚀</div>
+          <div>
+            <span class="badge" id="updatePopupBadge">🧪 BETA GÜNCELLEMESİ</span>
+            <h3 id="updatePopupTitle">Yeni Lumora Sürümü Hazır!</h3>
+            <p class="sub-sm" id="updatePopupSub">v1.2.1-beta → v1.2.2-beta</p>
+          </div>
+        </div>
+        <button class="icon-btn" id="btnUpdatePopupClose" title="Kapat">✕</button>
+      </div>
+
+      <div class="update-popup-notes" id="updatePopupNotesWrap">
+        <div class="release-notes-head">
+          <strong id="updatePopupNotesTitle">Sürüm Notları & Yenilikler</strong>
+          <button class="ghost-btn" id="btnPopupOpenGithub">GitHub'da İncele ↗</button>
+        </div>
+        <pre id="updatePopupNotesBody"></pre>
+      </div>
+
+      <div class="update-progress-wrap hidden" id="updatePopupProgressWrap">
+        <div class="progress-info">
+          <span id="updatePopupProgressText">Güncelleme paketi indiriliyor...</span>
+          <span id="updatePopupProgressPct">0%</span>
+        </div>
+        <div class="progress"><div class="progress-bar" id="updatePopupProgressBar"></div></div>
+      </div>
+
+      <p class="hint" id="updatePopupStatusMsg">İndirme tamamlandığında kurulum sihirbazı açılmadan arka planda otomatik güncellenir.</p>
+
+      <div class="modal-actions update-popup-actions">
+        <button class="ghost-btn" id="btnPopupLater">Daha Sonra</button>
+        <button class="play-btn sm-btn" id="btnPopupDownload">
+          <span class="play-label" id="lblPopupDownload">⬇ ŞİMDİ İNDİR VE KUR</span>
+        </button>
+        <button class="play-btn sm-btn hidden" id="btnPopupInstall">
+          <span class="play-label" id="lblPopupInstall">🚀 YENİDEN BAŞLAT & KUR</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Çökme Analizcisi Modalı -->

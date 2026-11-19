@@ -1160,6 +1160,69 @@ html[data-channel="beta"] .verified-pill {
   border-color: rgba(255, 159, 28, 0.45);
 }
 
+/* ---------- Güncelleme Bildirimi Popup Modalı ---------- */
+.modal-update {
+  width: min(540px, 92vw);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.update-popup-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.update-popup-title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.update-popup-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 8px 24px rgba(124, 92, 255, 0.35);
+}
+html[data-channel="beta"] .update-popup-icon {
+  background: linear-gradient(135deg, #ff9f1c, #ff3d71);
+  box-shadow: 0 8px 24px rgba(255, 159, 28, 0.38);
+}
+.update-popup-title-row h3 {
+  margin: 4px 0 2px;
+  font-size: 18px;
+}
+.update-popup-notes {
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.update-popup-notes pre {
+  margin: 8px 0 0;
+  max-height: 210px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text);
+  opacity: 0.92;
+}
+.update-popup-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 2px;
+}
+
 /* ---------- Profil Adı & Simge Düzenleme Şeridi ---------- */
 .rename-inst-box {
   margin: 12px 0 6px;

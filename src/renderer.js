@@ -1881,6 +1881,32 @@ function updateStats() {
 // ---------------- Güncelleme Sistemi (Sabit Resmi GitHub Deposu) ----------------
 const OFFICIAL_GITHUB_URL = 'https://github.com/lumora-launcher/lumora-launcher';
 
+function openUpdatePopup(ev) {
+  if (!ev) return;
+  const badge = $('updatePopupBadge');
+  if (badge) badge.textContent = i18nT(ev.prerelease ? 'upd_popup_badge_beta' : 'upd_popup_badge_stable');
+  $('updatePopupTitle').textContent = i18nFmt('upd_popup_title_fmt', { ver: ev.version });
+  const sizePart = ev.exeSize ? ` · ${(ev.exeSize / 1024 / 1024).toFixed(1)} MB` : '';
+  $('updatePopupSub').textContent = `v${sys.appVersion} → v${ev.version}${sizePart}`;
+
+  const notesWrap = $('updatePopupNotesWrap');
+  if (ev.releaseNotes) {
+    notesWrap.classList.remove('hidden');
+    $('updatePopupNotesBody').textContent = ev.releaseNotes;
+  } else {
+    notesWrap.classList.add('hidden');
+  }
+
+  $('updatePopupProgressWrap').classList.add('hidden');
+  const dlPopupBtn = $('btnPopupDownload');
+  dlPopupBtn.disabled = false;
+  dlPopupBtn.classList.remove('hidden');
+  $('lblPopupDownload').textContent = i18nT('upd_popup_dl_btn');
+  $('btnPopupInstall').classList.add('hidden');
+  $('updatePopupStatusMsg').textContent = i18nT('upd_popup_hint');
+  $('updatePopupModal').classList.remove('hidden');
+}
+
 function handleUpdateEvent(ev) {
   if (!ev) return;
   const checkBtn = $('btnCheckUpdate');
@@ -1889,6 +1915,7 @@ function handleUpdateEvent(ev) {
   const progWrap = $('updateProgressWrap');
   const notesBox = $('releaseNotesBox');
   const title = $('updateStatusTitle');
+  const dlLabel = dlBtn.querySelector('.play-label') || dlBtn;
 
   if (ev.state === 'checking') {
     checkBtn.disabled = true;
@@ -1898,70 +1925,133 @@ function handleUpdateEvent(ev) {
   }
 
   checkBtn.disabled = false;
-  checkBtn.querySelector('.play-label').textContent = 'GÜNCELLEMELERİ DENETLE';
+  checkBtn.querySelector('.play-label').textContent = i18nT('upd_check_btn');
 
   if (ev.state === 'available') {
     latestUpdateInfo = ev;
-    title.textContent = `Yeni sürüm bulundu: v${ev.version} (Mevcut: v${sys.appVersion})`;
+    title.textContent = `${i18nFmt('upd_popup_title_fmt', { ver: ev.version })} (v${sys.appVersion} → v${ev.version})`;
+    dlBtn.disabled = false;
+    dlLabel.textContent = i18nT('upd_popup_dl_btn');
     dlBtn.classList.remove('hidden');
     instBtn.classList.add('hidden');
     $('navUpdateDot').classList.add('show');
-    $('updateBannerText').textContent = `Lumora v${ev.version} yayınlandı! Yeni özellikler ve iyileştirmeler hazır.`;
+    $('updateBannerText').textContent = `${i18nFmt('upd_popup_title_fmt', { ver: ev.version })}`;
     $('updateBanner').classList.add('show');
 
     if (ev.releaseNotes) {
       notesBox.classList.remove('hidden');
-      $('releaseNotesTitle').textContent = `${ev.releaseName || 'v' + ev.version} Sürüm Notları`;
+      $('releaseNotesTitle').textContent = `${ev.releaseName || 'v' + ev.version} — ${i18nT('upd_notes_title')}`;
       $('releaseNotesBody').textContent = ev.releaseNotes;
     }
+    openUpdatePopup(ev);
   } else if (ev.state === 'downloading') {
+    const pct = Math.max(0, Math.min(100, Number(ev.percent) || 0));
+    const sizeTxt =
+      ev.total > 0
+        ? ` (${(ev.transferred / 1024 / 1024).toFixed(1)} / ${(ev.total / 1024 / 1024).toFixed(1)} MB)`
+        : '';
+
     progWrap.classList.remove('hidden');
-    $('updateProgressBar').style.width = `${ev.percent || 0}%`;
-    $('updateProgressPct').textContent = `${ev.percent || 0}%`;
-    $('updateProgressText').textContent = 'Güncelleme paketi indiriliyor...';
+    $('updateProgressBar').style.width = `${pct}%`;
+    $('updateProgressPct').textContent = `${pct}%`;
+    $('updateProgressText').textContent = `${i18nT('upd_popup_installing_btn')}${sizeTxt}`;
+    dlBtn.disabled = true;
+    dlLabel.textContent = `⏳ ${pct}%`;
+
+    const popupModal = $('updatePopupModal');
+    if (popupModal && !popupModal.classList.contains('hidden')) {
+      $('updatePopupProgressWrap').classList.remove('hidden');
+      $('updatePopupProgressBar').style.width = `${pct}%`;
+      $('updatePopupProgressPct').textContent = `${pct}%`;
+      $('updatePopupProgressText').textContent = `${i18nT('upd_popup_installing_btn')}${sizeTxt}`;
+      $('btnPopupDownload').disabled = true;
+      $('lblPopupDownload').textContent = `⏳ ${pct}%`;
+    }
   } else if (ev.state === 'downloaded') {
     progWrap.classList.add('hidden');
     dlBtn.classList.add('hidden');
     instBtn.classList.remove('hidden');
-    title.textContent =
+    $('updatePopupProgressWrap').classList.add('hidden');
+    $('btnPopupDownload').classList.add('hidden');
+    $('btnPopupInstall').classList.remove('hidden');
+    const doneMsg =
       ev.message || 'Güncelleme indirildi! Kurulum sihirbazı açılmadan arka planda sessizce güncellenip yeniden başlatılıyor...';
-    toast('Güncelleme indirildi! Sessiz kurulum başlatılıyor...');
+    title.textContent = doneMsg;
+    $('updatePopupStatusMsg').textContent = doneMsg;
+    toast(doneMsg);
   } else if (ev.state === 'up-to-date') {
     dlBtn.classList.add('hidden');
     instBtn.classList.add('hidden');
     notesBox.classList.add('hidden');
     $('navUpdateDot').classList.remove('show');
     $('updateBanner').classList.remove('show');
-    title.textContent = ev.message || `En güncel sürümü kullanıyorsun (v${sys.appVersion}).`;
+    title.textContent = ev.message || `v${sys.appVersion}`;
   } else if (ev.state === 'no-release') {
     dlBtn.classList.add('hidden');
     instBtn.classList.add('hidden');
     notesBox.classList.add('hidden');
     title.textContent = ev.message;
   } else if (ev.state === 'error') {
+    dlBtn.disabled = false;
+    dlLabel.textContent = i18nT('upd_popup_dl_btn');
+    $('btnPopupDownload').disabled = false;
+    $('lblPopupDownload').textContent = i18nT('upd_popup_dl_btn');
     title.textContent = `Hata: ${ev.message}`;
+    $('updatePopupStatusMsg').textContent = `Hata: ${ev.message}`;
+    toast(ev.message, true);
   }
 }
 
 window.api.onUpdateEvent(handleUpdateEvent);
 
+async function startUpdateDownload() {
+  if (!latestUpdateInfo) return;
+  const dlBtn = $('btnDownloadUpdate');
+  const dlLabel = dlBtn.querySelector('.play-label') || dlBtn;
+  dlBtn.disabled = true;
+  dlLabel.textContent = i18nT('upd_popup_installing_btn');
+  $('btnPopupDownload').disabled = true;
+  $('lblPopupDownload').textContent = i18nT('upd_popup_installing_btn');
+
+  const url = latestUpdateInfo.downloadUrl || latestUpdateInfo.htmlUrl;
+  const res = await window.api.downloadUpdate(url);
+  if (!res || !res.ok) {
+    dlBtn.disabled = false;
+    dlLabel.textContent = i18nT('upd_popup_dl_btn');
+    $('btnPopupDownload').disabled = false;
+    $('lblPopupDownload').textContent = i18nT('upd_popup_dl_btn');
+    toast((res && res.error) || 'Update error', true);
+  } else if (res.mode === 'browser') {
+    dlBtn.disabled = false;
+    dlLabel.textContent = i18nT('upd_popup_dl_btn');
+    $('btnPopupDownload').disabled = false;
+    $('lblPopupDownload').textContent = i18nT('upd_popup_dl_btn');
+  }
+}
+
 $('btnCheckUpdate').onclick = async () => {
   const r = await window.api.checkForUpdates();
   if (r && r.state === 'up-to-date') toast('Lumora güncel!');
-  else if (r && r.state === 'available') toast(`Yeni sürüm mevcut: v${r.version}`);
-  else if (r && r.state === 'no-release') toast('Henüz yayınlanmış yeni bir Release yok');
+  else if (r && r.state === 'available') toast(`${i18nFmt('upd_popup_title_fmt', { ver: r.version })}`);
+  else if (r && r.state === 'no-release') toast(r.message || 'Henüz Release yok');
 };
 
-$('btnDownloadUpdate').onclick = async () => {
-  const url = latestUpdateInfo && (latestUpdateInfo.downloadUrl || latestUpdateInfo.htmlUrl);
-  const res = await window.api.downloadUpdate(url);
-  if (!res.ok) toast(res.error, true);
-  else if (res.mode === 'browser') toast('İndirme sayfası tarayıcıda açıldı');
-};
+$('btnDownloadUpdate').onclick = () => startUpdateDownload();
+$('btnPopupDownload').onclick = () => startUpdateDownload();
 
 $('btnInstallUpdate').onclick = async () => {
   const res = await window.api.installUpdate();
   if (!res.ok) toast(res.error, true);
+};
+$('btnPopupInstall').onclick = async () => {
+  const res = await window.api.installUpdate();
+  if (!res.ok) toast(res.error, true);
+};
+
+$('btnUpdatePopupClose').onclick = () => $('updatePopupModal').classList.add('hidden');
+$('btnPopupLater').onclick = () => $('updatePopupModal').classList.add('hidden');
+$('btnPopupOpenGithub').onclick = () => {
+  window.api.openExternal((latestUpdateInfo && latestUpdateInfo.htmlUrl) || OFFICIAL_GITHUB_URL);
 };
 
 $('btnOpenReleasePage').onclick = () => {
@@ -1973,8 +2063,8 @@ $('btnOpenGithubRepo').onclick = () => {
 };
 
 $('btnBannerUpdate').onclick = () => {
-  navigateTo('updates');
-  if (latestUpdateInfo) $('btnDownloadUpdate').click();
+  if (latestUpdateInfo) openUpdatePopup(latestUpdateInfo);
+  else navigateTo('updates');
 };
 $('btnBannerDismiss').onclick = () => $('updateBanner').classList.remove('show');
 $('autoUpdateCheck').addEventListener('change', (e) => persist({ autoUpdateCheck: e.target.checked }));

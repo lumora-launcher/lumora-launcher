@@ -1705,6 +1705,97 @@
     }
   };
 
+  const POPUP_TRANSLATIONS = {
+    tr: {
+      upd_popup_badge_beta: '🧪 BETA GÜNCELLEMESİ',
+      upd_popup_badge_stable: '✨ YENİ GÜNCELLEME',
+      upd_popup_title_fmt: 'Lumora v{ver} Hazır!',
+      upd_popup_notes_hdr: 'Sürüm Notları & Yenilikler',
+      upd_popup_open_gh: "GitHub'da İncele ↗",
+      upd_popup_hint: 'İndirme tamamlandığında kurulum sihirbazı açılmadan arka planda otomatik güncellenir.',
+      upd_popup_dl_btn: '⬇ ŞİMDİ İNDİR VE KUR',
+      upd_popup_installing_btn: '⏳ İNDİRİLİYOR...',
+      upd_popup_restart_btn: '🚀 YENİDEN BAŞLAT & KUR',
+      upd_popup_later: 'Daha Sonra'
+    },
+    en: {
+      upd_popup_badge_beta: '🧪 BETA UPDATE',
+      upd_popup_badge_stable: '✨ NEW UPDATE',
+      upd_popup_title_fmt: 'Lumora v{ver} is Ready!',
+      upd_popup_notes_hdr: 'Release Notes & Changes',
+      upd_popup_open_gh: 'View on GitHub ↗',
+      upd_popup_hint: 'Once downloaded, Lumora updates silently in the background and restarts automatically.',
+      upd_popup_dl_btn: '⬇ DOWNLOAD & INSTALL',
+      upd_popup_installing_btn: '⏳ DOWNLOADING...',
+      upd_popup_restart_btn: '🚀 RESTART & INSTALL',
+      upd_popup_later: 'Later'
+    },
+    de: {
+      upd_popup_badge_beta: '🧪 BETA-UPDATE',
+      upd_popup_badge_stable: '✨ NEUES UPDATE',
+      upd_popup_title_fmt: 'Lumora v{ver} ist bereit!',
+      upd_popup_notes_hdr: 'Versionshinweise & Änderungen',
+      upd_popup_open_gh: 'Auf GitHub ansehen ↗',
+      upd_popup_hint: 'Nach dem Download wird Lumora automatisch im Hintergrund aktualisiert und neu gestartet.',
+      upd_popup_dl_btn: '⬇ JETZT INSTALLIEREN',
+      upd_popup_installing_btn: '⏳ WIRD GELADEN...',
+      upd_popup_restart_btn: '🚀 NEU STARTEN & INSTALLIEREN',
+      upd_popup_later: 'Später'
+    },
+    es: {
+      upd_popup_badge_beta: '🧪 ACTUALIZACIÓN BETA',
+      upd_popup_badge_stable: '✨ NUEVA VERSIÓN',
+      upd_popup_title_fmt: '¡Lumora v{ver} está lista!',
+      upd_popup_notes_hdr: 'Notas y novedades',
+      upd_popup_open_gh: 'Ver en GitHub ↗',
+      upd_popup_hint: 'Al finalizar la descarga, Lumora se actualiza en segundo plano y se reinicia automáticamente.',
+      upd_popup_dl_btn: '⬇ DESCARGAR E INSTALAR',
+      upd_popup_installing_btn: '⏳ DESCARGANDO...',
+      upd_popup_restart_btn: '🚀 REINICIAR E INSTALAR',
+      upd_popup_later: 'Más tarde'
+    },
+    ru: {
+      upd_popup_badge_beta: '🧪 БЕТА-ОБНОВЛЕНИЕ',
+      upd_popup_badge_stable: '✨ НОВОЕ ОБНОВЛЕНИЕ',
+      upd_popup_title_fmt: 'Lumora v{ver} готова!',
+      upd_popup_notes_hdr: 'Список изменений',
+      upd_popup_open_gh: 'На GitHub ↗',
+      upd_popup_hint: 'После загрузки обновление установится в фоновом режиме и лаунчер перезапустится.',
+      upd_popup_dl_btn: '⬇ СКАЧАТЬ И УСТАНОВИТЬ',
+      upd_popup_installing_btn: '⏳ ЗАГРУЗКА...',
+      upd_popup_restart_btn: '🚀 ПЕРЕЗАПУСТИТЬ И УСТАНОВИТЬ',
+      upd_popup_later: 'Позже'
+    },
+    fr: {
+      upd_popup_badge_beta: '🧪 MISE À JOUR BÊTA',
+      upd_popup_badge_stable: '✨ NOUVELLE VERSION',
+      upd_popup_title_fmt: 'Lumora v{ver} est prête !',
+      upd_popup_notes_hdr: 'Notes de version',
+      upd_popup_open_gh: 'Voir sur GitHub ↗',
+      upd_popup_hint: 'Une fois téléchargée, la mise à jour s\'installe automatiquement en arrière-plan.',
+      upd_popup_dl_btn: '⬇ TÉLÉCHARGER ET INSTALLER',
+      upd_popup_installing_btn: '⏳ TÉLÉCHARGEMENT...',
+      upd_popup_restart_btn: '🚀 REDÉMARRER ET INSTALLER',
+      upd_popup_later: 'Plus tard'
+    },
+    pt: {
+      upd_popup_badge_beta: '🧪 ATUALIZAÇÃO BETA',
+      upd_popup_badge_stable: '✨ NOVA VERSÃO',
+      upd_popup_title_fmt: 'Lumora v{ver} pronta!',
+      upd_popup_notes_hdr: 'Notas da versão',
+      upd_popup_open_gh: 'Ver no GitHub ↗',
+      upd_popup_hint: 'Após baixar, o Lumora atualiza silenciosamente em segundo plano e reinicia sozinho.',
+      upd_popup_dl_btn: '⬇ BAIXAR E INSTALAR',
+      upd_popup_installing_btn: '⏳ BAIXANDO...',
+      upd_popup_restart_btn: '🚀 REINICIAR E INSTALAR',
+      upd_popup_later: 'Depois'
+    }
+  };
+
+  for (const [k, obj] of Object.entries(POPUP_TRANSLATIONS)) {
+    if (EXTRA_TRANSLATIONS[k]) Object.assign(EXTRA_TRANSLATIONS[k], obj);
+  }
+
   for (const [k, obj] of Object.entries(EXTRA_TRANSLATIONS)) {
     if (TRANSLATIONS[k]) Object.assign(TRANSLATIONS[k], obj);
   }
@@ -1914,10 +2005,16 @@
     setText('#page-updates .page-title', d.upd_page_title);
     setText('#updateStatusTitle', d.upd_status_default);
     setText('#btnCheckUpdate .play-label', d.upd_check_btn);
-    setText('#btnDownloadUpdate', d.upd_download_btn);
-    setText('#btnInstallUpdate', d.upd_restart_btn);
+    setText('#btnDownloadUpdate .play-label', d.upd_download_btn);
+    setText('#btnInstallUpdate .play-label', d.upd_restart_btn);
     setText('#releaseNotesTitle', d.upd_notes_title);
     setText('#btnOpenReleasePage', d.upd_open_gh);
+    setText('#updatePopupNotesTitle', d.upd_popup_notes_hdr);
+    setText('#btnPopupOpenGithub', d.upd_popup_open_gh);
+    setText('#updatePopupStatusMsg', d.upd_popup_hint);
+    setText('#btnPopupLater', d.upd_popup_later);
+    setText('#lblPopupDownload', d.upd_popup_dl_btn);
+    setText('#lblPopupInstall', d.upd_popup_restart_btn);
     const updCards = document.querySelectorAll('#page-updates .card');
     if (updCards[1]) {
       const h3 = updCards[1].querySelector('h3');

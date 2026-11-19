@@ -1461,7 +1461,7 @@ function compareSemver(a, b) {
     const raw = String(v || '').replace(/^v/i, '').trim();
     const [core, pre] = raw.split('-', 2);
     const nums = core.split('.').map((n) => parseInt(n, 10) || 0);
-    return { nums, pre: pre || '' };
+    return { nums, pre: (pre || '').toLowerCase() };
   };
   const pa = parse(a);
   const pb = parse(b);
@@ -1485,8 +1485,16 @@ function runSilentUpdateInstall() {
     isQuitting = true;
     const installer = directDownloadedInstallerPath;
     const exePath = process.execPath;
-    const script = `timeout /t 2 /nobreak >nul & "${installer}" /S & start "" "${exePath}"`;
-    const child = spawn('cmd.exe', ['/d', '/s', '/c', `"${script}"`], {
+    const cmdPath = path.join(app.getPath('temp'), `lumora-update-${Date.now()}.cmd`);
+    const batBody = [
+      '@echo off',
+      'timeout /t 2 /nobreak >nul',
+      `start "" /wait "${installer}" /S`,
+      `start "" "${exePath}"`,
+      'del "%~f0"'
+    ].join('\r\n');
+    fs.writeFileSync(cmdPath, batBody, 'utf8');
+    const child = spawn('cmd.exe', ['/d', '/s', '/c', `"${cmdPath}"`], {
       detached: true,
       stdio: 'ignore',
       windowsHide: true,
@@ -1520,27 +1528,6 @@ function setupAutoUpdater() {
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.allowPrerelease = true;
 
-  autoUpdater.on('checking-for-update', () => {
-    send('update:event', { state: 'checking', message: 'Resmi GitHub sunucusundan güncellemeler denetleniyor...' });
-  });
-
-  autoUpdater.on('update-available', (info) => {
-    send('update:event', {
-      state: 'available',
-      version: info.version,
-      releaseNotes: cleanReleaseNotes(info.releaseNotes),
-      releaseDate: info.releaseDate || null
-    });
-  });
-
-  autoUpdater.on('update-not-available', (info) => {
-    send('update:event', {
-      state: 'up-to-date',
-      version: (info && info.version) || getAppVersion(),
-      message: 'En güncel Lumora sürümünü kullanıyorsun!'
-    });
-  });
-
   autoUpdater.on('download-progress', (p) => {
     send('update:event', {
       state: 'downloading',
@@ -1566,7 +1553,11 @@ function setupAutoUpdater() {
   });
 }
 
-async function downloadInstallerDirectly(exeUrl, ymlUrlOverride = null) {
+async function downloadInstallerDirectly(exeUrl, ymlUrlOverride = null, expectedSha256 = null) {
+  const allowedPrefix = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/`;
+  if (!exeUrl || !String(exeUrl).startsWith(allowedPrefix)) {
+    throw new Error('Güvenlik uyarısı: Yalnızca resmi GitHub Release adresinden indirme yapılabilir.');
+  }
   const dest = path.join(app.getPath('temp'), `Lumora-Launcher-Update-${Date.now()}.exe`);
   const res = await fetch(exeUrl, { headers: { 'User-Agent': USER_AGENT } });
   if (!res.ok) throw new Error(`İndirme hatası (HTTP ${res.status})`);
@@ -1591,31 +1582,33 @@ async function downloadInstallerDirectly(exeUrl, ymlUrlOverride = null) {
 
   const fileBuf = Buffer.concat(chunks);
 
-  // Güvenlik: resmi Release'teki latest.yml / beta.yml içindeki SHA-512 ile doğrula
-  const ymlCandidates = [
-    ymlUrlOverride,
-    `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/latest.yml`,
-    `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/beta.yml`
-  ].filter(Boolean);
-
-  let ymlText = null;
-  for (const ymlCandidate of ymlCandidates) {
+  // Güvenlik: Release asset SHA-256 özeti veya aynı Release içindeki latest.yml / beta.yml SHA-512 imzası ile doğrula
+  let verified = false;
+  if (expectedSha256) {
+    const actualSha256 = crypto.createHash('sha256').update(fileBuf).digest('hex').toLowerCase();
+    if (actualSha256 !== expectedSha256.toLowerCase()) {
+      throw new Error('İndirilen dosyanın SHA-256 özeti GitHub sürümüyle eşleşmiyor! Kurulum güvenlik nedeniyle iptal edildi.');
+    }
+    verified = true;
+  } else if (ymlUrlOverride) {
+    let ymlText = null;
     try {
-      const ymlRes = await fetch(ymlCandidate, { headers: { 'User-Agent': USER_AGENT } });
-      if (ymlRes.ok) {
-        ymlText = await ymlRes.text();
-        break;
-      }
+      const ymlRes = await fetch(ymlUrlOverride, { headers: { 'User-Agent': USER_AGENT } });
+      if (ymlRes.ok) ymlText = await ymlRes.text();
     } catch {}
+    if (!ymlText) {
+      throw new Error('Güncelleme doğrulama dosyası indirilemedi, kurulum güvenlik nedeniyle iptal edildi.');
+    }
+    const shaMatch = ymlText.match(/^sha512:\s*(\S+)/m);
+    const actualSha512 = crypto.createHash('sha512').update(fileBuf).digest('base64');
+    if (!shaMatch || shaMatch[1] !== actualSha512) {
+      throw new Error('İndirilen dosyanın SHA-512 imzası resmi sürümle eşleşmiyor! Kurulum güvenlik nedeniyle iptal edildi.');
+    }
+    verified = true;
   }
 
-  if (!ymlText) {
-    throw new Error('Güncelleme doğrulama dosyası (latest.yml) bulunamadı, kurulum güvenlik nedeniyle iptal edildi.');
-  }
-  const shaMatch = ymlText.match(/^sha512:\s*(\S+)/m);
-  const actualSha = crypto.createHash('sha512').update(fileBuf).digest('base64');
-  if (!shaMatch || shaMatch[1] !== actualSha) {
-    throw new Error('İndirilen dosyanın SHA-512 imzası resmi sürümle eşleşmiyor! Kurulum güvenlik nedeniyle iptal edildi.');
+  if (!verified) {
+    throw new Error('Sürüm dosyası için doğrulama imzası bulunamadı, kurulum güvenlik nedeniyle iptal edildi.');
   }
 
   fs.writeFileSync(dest, fileBuf);
@@ -1623,7 +1616,7 @@ async function downloadInstallerDirectly(exeUrl, ymlUrlOverride = null) {
   send('update:event', {
     state: 'downloaded',
     version: 'Yeni Sürüm',
-    message: 'Güncelleme indirildi ve SHA-512 imzası doğrulandı! Arka planda sessizce güncellenip yeniden başlatılıyor...'
+    message: 'Güncelleme indirildi ve doğrulandı! Arka planda sessizce güncellenip yeniden başlatılıyor...'
   });
   if (app.isPackaged) {
     setTimeout(() => runSilentUpdateInstall(), 1200);
@@ -1672,6 +1665,11 @@ async function checkOfficialGithubRelease() {
   const assets = Array.isArray(data.assets) ? data.assets : [];
   const exeAsset = assets.find((a) => /\.exe$/i.test(a.name)) || null;
   const ymlAsset = assets.find((a) => /^(beta|latest)\.yml$/i.test(a.name)) || null;
+  const exeSha256 =
+    exeAsset && typeof exeAsset.digest === 'string' && exeAsset.digest.startsWith('sha256:')
+      ? exeAsset.digest.slice(7).toLowerCase()
+      : null;
+  const exeSize = exeAsset && exeAsset.size ? Number(exeAsset.size) : 0;
 
   if (compareSemver(latestVer, currentVer) > 0) {
     return {
@@ -1685,6 +1683,9 @@ async function checkOfficialGithubRelease() {
       htmlUrl: data.html_url,
       downloadUrl: exeAsset ? exeAsset.browser_download_url : data.html_url,
       ymlUrl: ymlAsset ? ymlAsset.browser_download_url : null,
+      exeSha256,
+      exeSize,
+      hasDirectExe: Boolean(exeAsset && exeAsset.browser_download_url),
       canAutoInstall: app.isPackaged
     };
   }
@@ -1705,15 +1706,6 @@ ipcMain.handle('update:check', async () => {
     message: 'Resmi GitHub deposu (lumora-launcher/lumora-launcher) kontrol ediliyor...'
   });
 
-  if (app.isPackaged) {
-    try {
-      autoUpdater.setFeedURL({ provider: 'github', owner: GITHUB_OWNER, repo: GITHUB_REPO });
-      autoUpdater.checkForUpdates().catch(() => {});
-    } catch {
-      // GitHub API kontrolü aşağıda devam eder
-    }
-  }
-
   try {
     const result = await checkOfficialGithubRelease();
     send('update:event', result);
@@ -1726,39 +1718,29 @@ ipcMain.handle('update:check', async () => {
 });
 
 ipcMain.handle('update:download', async (_e, fallbackUrl) => {
-  if (app.isPackaged) {
-    try {
-      await autoUpdater.downloadUpdate();
-      return { ok: true, mode: 'updater' };
-    } catch (err) {
-      // Eğer latest.yml içindeki dosya adı ile GitHub'daki .exe adı farklıysa veya pre-release ise doğrudan .exe'yi indir
-      try {
-        const rel = await checkOfficialGithubRelease();
-        const exeUrl = fallbackUrl && /\.exe$/i.test(fallbackUrl) ? fallbackUrl : rel.downloadUrl;
-        if (exeUrl && /\.exe$/i.test(exeUrl)) {
-          await downloadInstallerDirectly(exeUrl, rel.ymlUrl || null);
-          return { ok: true, mode: 'direct-installer' };
-        }
-      } catch {}
-      if (fallbackUrl) {
-        shell.openExternal(fallbackUrl);
-        return { ok: true, mode: 'browser' };
-      }
-      return { ok: false, error: err.message || String(err) };
+  try {
+    const rel = await checkOfficialGithubRelease();
+    const exeUrl =
+      rel && rel.downloadUrl && /\.exe$/i.test(rel.downloadUrl)
+        ? rel.downloadUrl
+        : fallbackUrl && /\.exe$/i.test(fallbackUrl)
+        ? fallbackUrl
+        : null;
+
+    if (exeUrl) {
+      await downloadInstallerDirectly(exeUrl, rel ? rel.ymlUrl : null, rel ? rel.exeSha256 : null);
+      return { ok: true, mode: 'direct-installer' };
     }
-  } else {
-    if (fallbackUrl && /\.exe$/i.test(fallbackUrl)) {
-      try {
-        const rel = await checkOfficialGithubRelease().catch(() => ({}));
-        await downloadInstallerDirectly(fallbackUrl, rel.ymlUrl || null);
-        return { ok: true, mode: 'direct-installer' };
-      } catch {}
-    }
-    if (fallbackUrl && /^https?:\/\//i.test(fallbackUrl)) {
-      shell.openExternal(fallbackUrl);
+    const openUrl = (rel && rel.htmlUrl) || fallbackUrl;
+    if (openUrl && /^https?:\/\//i.test(openUrl)) {
+      shell.openExternal(openUrl);
       return { ok: true, mode: 'browser' };
     }
-    return { ok: false, error: 'Geliştirici modunda otomatik kurulum yapılamaz.' };
+    return { ok: false, error: 'İndirilebilir kurulum dosyası bulunamadı.' };
+  } catch (err) {
+    const errMsg = err.message || String(err);
+    send('update:event', { state: 'error', message: errMsg });
+    return { ok: false, error: errMsg };
   }
 });
 
