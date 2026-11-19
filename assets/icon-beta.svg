@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#26120A"/>
+      <stop offset="50%" stop-color="#190E14"/>
+      <stop offset="100%" stop-color="#120A18"/>
+    </linearGradient>
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFD166" stop-opacity="0.9"/>
+      <stop offset="50%" stop-color="#FF9F1C" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#FF3D71" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="topFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFE88C"/>
+      <stop offset="100%" stop-color="#FFA834"/>
+    </linearGradient>
+    <linearGradient id="leftFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF6B35"/>
+      <stop offset="100%" stop-color="#B91C3C"/>
+    </linearGradient>
+    <linearGradient id="rightFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFC42E"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+    <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFC42E" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#FF6B35" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#000000" flood-opacity="0.65"/>
+    </filter>
+  </defs>
+
+  <rect x="20" y="20" width="472" height="472" rx="112" fill="url(#bgGrad)"/>
+  <rect x="23" y="23" width="466" height="466" rx="109" fill="none" stroke="url(#borderGrad)" stroke-width="6"/>
+  <circle cx="256" cy="256" r="215" fill="url(#coreGlow)"/>
+  <circle cx="256" cy="256" r="176" fill="none" stroke="url(#borderGrad)" stroke-width="4" stroke-dasharray="55 28" opacity="0.65"/>
+
+  <g filter="url(#dropShadow)">
+    <polygon points="256,104 388,180 256,256 124,180" fill="url(#topFace)"/>
+    <polygon points="124,180 256,256 256,408 124,332" fill="url(#leftFace)"/>
+    <polygon points="256,256 388,180 388,332 256,408" fill="url(#rightFace)"/>
+    <polygon points="256,144 346,196 256,248 166,196" fill="#FFFFFF" opacity="0.18"/>
+    <polyline points="124,180 256,256 388,180" fill="none" stroke="#FFF8E8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+    <line x1="256" y1="256" x2="256" y2="408" stroke="#FFF8E8" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+    <polygon points="256,104 388,180 388,332 256,408 124,332 124,180" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" opacity="0.32"/>
+  </g>
+
+  <circle cx="136" cy="126" r="6" fill="#FFD166" opacity="0.9"/>
+  <circle cx="382" cy="134" r="5" fill="#FF6B35" opacity="0.9"/>
+  <circle cx="372" cy="382" r="7" fill="#FFC42E" opacity="0.85"/>
+  <circle cx="142" cy="376" r="4.5" fill="#FF5277" opacity="0.8"/>
+</svg>

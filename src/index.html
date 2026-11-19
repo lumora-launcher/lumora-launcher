@@ -22,7 +22,7 @@
           <svg viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 2.3 6.7 3.7L12 11.7 5.3 8 12 4.3ZM5 9.7l6 3.3v6.7l-6-3.3V9.7Zm8 10V13l6-3.3v6.7l-6 3.3Z"/></svg>
         </div>
       </div>
-      <h1 class="splash-title">LUMORA</h1>
+      <h1 class="splash-title">LUMORA <span class="splash-beta-tag" id="splashBetaTag">BETA</span></h1>
       <p class="splash-sub" id="splashStatus">Sistem hazırlanıyor...</p>
       <div class="splash-bar">
         <div class="splash-bar-fill" id="splashFill"></div>
@@ -48,6 +48,7 @@
         <svg viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 2.3 6.7 3.7L12 11.7 5.3 8 12 4.3ZM5 9.7l6 3.3v6.7l-6-3.3V9.7Zm8 10V13l6-3.3v6.7l-6 3.3Z"/></svg>
       </div>
       <span class="brand-name">Lumora</span>
+      <span class="beta-pill" id="betaChannelBadge" title="Beta Önizleme Kanalı — Normal sürümden bağımsız kurulur">🧪 BETA</span>
       <span class="version-pill" id="appVersionBadge" title="Güncellemeleri kontrol et">v1.2.1-beta</span>
     </div>
 
@@ -128,9 +129,12 @@
       <section class="page active" id="page-home">
         <div class="hero stagger-1">
           <div class="hero-text">
-            <div class="status-pill" id="netStatusPill">
-              <span class="online-dot" id="netStatusDot"></span>
-              <span id="netStatusText">Mojang API kontrol ediliyor...</span>
+            <div class="hero-pills-row">
+              <div class="status-pill" id="netStatusPill">
+                <span class="online-dot" id="netStatusDot"></span>
+                <span id="netStatusText">Mojang API kontrol ediliyor...</span>
+              </div>
+              <span class="beta-hero-pill" id="betaHeroBadge">🧪 BETA ÖNİZLEME SÜRÜMÜ</span>
             </div>
             <p class="eyebrow" id="greeting">Tekrar hoş geldin</p>
             <h1>Maceraya <span class="gradient-text">hazır mısın?</span></h1>
@@ -684,7 +688,7 @@
                   <div class="update-ver-line">
                     <h3>Lumora Launcher</h3>
                     <span class="badge" id="currentVerText">v1.2.1-beta</span>
-                    <span class="verified-pill">✓ Resmi Sürüm</span>
+                    <span class="verified-pill" id="releaseChannelPill">✓ Resmi Sürüm</span>
                   </div>
                   <p class="sub-sm" id="updateStatusTitle">Güncellemeler resmi GitHub sunucusu üzerinden otomatik denetlenir.</p>
                 </div>

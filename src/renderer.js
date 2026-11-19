@@ -145,7 +145,7 @@ function playSplashIntro(force = false) {
   }
   splash.classList.remove('hide');
   fill.style.width = '15%';
-  status.textContent = 'Lumora çekirdeği başlatılıyor...';
+  status.textContent = sys.isBeta ? 'Lumora Beta önizleme çekirdeği başlatılıyor...' : 'Lumora çekirdeği başlatılıyor...';
 
   setTimeout(() => {
     fill.style.width = '55%';
@@ -2351,6 +2351,11 @@ playBtn.onclick = () => launchWithQuickPlay();
   sys = await window.api.systemInfo();
   settings = await window.api.getSettings();
   activeInstanceId = settings.activeInstanceId || 'default-vanilla';
+
+  const isBeta = !!sys.isBeta;
+  document.documentElement.setAttribute('data-channel', isBeta ? 'beta' : 'stable');
+  const chPill = $('releaseChannelPill');
+  if (chPill) chPill.textContent = isBeta ? '🧪 Beta Önizleme Sürümü' : '✓ Resmi Sürüm';
 
   $('appVersionBadge').textContent = `v${sys.appVersion}`;
   $('currentVerText').textContent = `v${sys.appVersion}`;

@@ -1,6 +1,6 @@
 {
   "name": "lumora-launcher",
-  "productName": "Lumora Launcher",
+  "productName": "Lumora Launcher Beta",
   "version": "1.2.1-beta",
   "description": "Modern, açık kaynaklı kişisel Minecraft Launcher",
   "homepage": "https://github.com/lumora-launcher/lumora-launcher",
@@ -11,15 +11,19 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win",
+    "channel:beta": "node scripts/set-channel.js beta",
+    "channel:stable": "node scripts/set-channel.js stable",
+    "dist": "node scripts/set-channel.js auto && electron-builder --win",
+    "dist:beta": "node scripts/set-channel.js beta && electron-builder --win",
+    "dist:stable": "node scripts/set-channel.js stable && electron-builder --win",
     "publish": "electron-builder --win --publish always"
   },
   "author": "Doruk",
   "license": "MIT",
   "build": {
-    "appId": "com.lumora.launcher",
-    "productName": "Lumora Launcher",
-    "icon": "assets/icon.ico",
+    "appId": "com.lumora.launcher.beta",
+    "productName": "Lumora Launcher Beta",
+    "icon": "assets/icon-beta.ico",
     "publish": [
       {
         "provider": "github",
@@ -30,18 +34,18 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.ico",
-      "artifactName": "Lumora-Launcher-Setup-${version}.${ext}"
+      "icon": "assets/icon-beta.ico",
+      "artifactName": "Lumora-Launcher-Beta-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
-      "installerHeaderIcon": "assets/icon.ico",
+      "installerIcon": "assets/icon-beta.ico",
+      "uninstallerIcon": "assets/icon-beta.ico",
+      "installerHeaderIcon": "assets/icon-beta.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Lumora Launcher"
+      "shortcutName": "Lumora Launcher Beta"
     }
   },
   "dependencies": {

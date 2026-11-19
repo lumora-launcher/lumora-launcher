@@ -28,6 +28,7 @@ const GITHUB_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
 
 const pkg = require('./package.json');
 const getAppVersion = () => pkg.version || app.getVersion();
+const isBetaChannel = () => /-(beta|alpha|rc|preview)/i.test(getAppVersion());
 const MANIFEST_URL = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json';
 const MODRINTH_API = 'https://api.modrinth.com/v2';
 const USER_AGENT = `Lumora-Launcher/${getAppVersion()} (github.com/lumora-launcher/lumora-launcher)`;
@@ -144,21 +145,26 @@ function getInstanceDir(instanceId, baseGameDir) {
 // ---------------- Sistem Tepsisi (System Tray) & Discord Rich Presence ----------------
 function setupTray() {
   if (tray) return;
-  const iconPath = path.join(__dirname, 'assets', 'icon.ico');
-  const pngPath = path.join(__dirname, 'assets', 'icon.png');
-  const targetIcon = fs.existsSync(iconPath) ? iconPath : pngPath;
+  const beta = isBetaChannel();
+  const iconPath = path.join(__dirname, 'assets', beta ? 'icon-beta.ico' : 'icon.ico');
+  const pngPath = path.join(__dirname, 'assets', beta ? 'icon-beta.png' : 'icon.png');
+  const targetIcon = fs.existsSync(iconPath)
+    ? iconPath
+    : fs.existsSync(pngPath)
+    ? pngPath
+    : path.join(__dirname, 'assets', 'icon.ico');
   if (!fs.existsSync(targetIcon)) return;
 
   try {
     tray = new Tray(nativeImage.createFromPath(targetIcon));
-    tray.setToolTip(`${APP_NAME} Launcher v${getAppVersion()}`);
+    tray.setToolTip(`${APP_NAME} Launcher${beta ? ' BETA' : ''} v${getAppVersion()}`);
     const updateMenu = () => {
       const s = loadSettings();
       const instances = loadInstances();
       const activeInst = instances.find((x) => x.id === s.activeInstanceId) || instances[0];
       const menu = Menu.buildFromTemplate([
         {
-          label: `${APP_NAME} Launcher v${getAppVersion()}`,
+          label: `${APP_NAME} Launcher${beta ? ' BETA' : ''} v${getAppVersion()}`,
           enabled: false
         },
         { type: 'separator' },
@@ -319,7 +325,10 @@ function setDiscordActivity(activity) {
 
 // ---------------- Pencere ----------------
 function createWindow() {
-  const iconPath = path.join(__dirname, 'assets', 'icon.ico');
+  const beta = isBetaChannel();
+  const iconPath = path.join(__dirname, 'assets', beta ? 'icon-beta.ico' : 'icon.ico');
+  const fallbackIcon = path.join(__dirname, 'assets', 'icon.ico');
+  const resolvedIcon = fs.existsSync(iconPath) ? iconPath : fallbackIcon;
   win = new BrowserWindow({
     width: 1160,
     height: 720,
@@ -327,8 +336,8 @@ function createWindow() {
     minHeight: 620,
     frame: false,
     backgroundColor: '#0b0d14',
-    title: `${APP_NAME} Launcher`,
-    icon: fs.existsSync(iconPath) ? iconPath : undefined,
+    title: `${APP_NAME} Launcher${beta ? ' BETA' : ''}`,
+    icon: fs.existsSync(resolvedIcon) ? resolvedIcon : undefined,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -390,6 +399,8 @@ ipcMain.handle('system:info', () => ({
   totalRam: Math.floor(os.totalmem() / 1024 / 1024),
   appName: APP_NAME,
   appVersion: getAppVersion(),
+  isBeta: isBetaChannel(),
+  channel: isBetaChannel() ? 'beta' : 'stable',
   githubUrl: GITHUB_URL,
   isPackaged: app.isPackaged
 }));

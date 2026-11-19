@@ -1103,6 +1103,55 @@ select.inst-ram-select:hover { border-color: var(--accent); }
   height: 1px; background: var(--panel-border); margin: 2px 0;
 }
 
+/* ---------- Beta Kanal Görünümü (Normal Sürümden Ayırt Edici Tasarım) ---------- */
+.beta-pill, .splash-beta-tag, .beta-hero-pill { display: none; }
+.hero-pills-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+.hero-pills-row .status-pill { margin-bottom: 0; }
+
+html[data-channel="beta"] .titlebar {
+  position: relative;
+  border-bottom: 1px solid rgba(255, 159, 28, 0.25);
+  background: linear-gradient(90deg, rgba(255, 159, 28, 0.08), rgba(255, 61, 113, 0.05) 45%, transparent);
+}
+html[data-channel="beta"] .titlebar::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, #ffd166, #ff9f1c, #ff3d71);
+  pointer-events: none;
+}
+html[data-channel="beta"] .logo {
+  background: linear-gradient(135deg, #ff9f1c, #ff3d71);
+  box-shadow: 0 4px 18px rgba(255, 159, 28, 0.45);
+}
+html[data-channel="beta"] .splash-logo {
+  background: linear-gradient(135deg, #ff9f1c, #ff3d71);
+  box-shadow: 0 14px 40px rgba(255, 159, 28, 0.45);
+}
+html[data-channel="beta"] .beta-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  -webkit-app-region: no-drag;
+  padding: 2px 9px; border-radius: 99px; font-size: 10.5px; font-weight: 800; letter-spacing: .7px;
+  color: #ffd166; background: rgba(255, 159, 28, 0.16);
+  border: 1px solid rgba(255, 159, 28, 0.55);
+  box-shadow: 0 0 14px rgba(255, 159, 28, 0.25);
+}
+html[data-channel="beta"] .splash-beta-tag {
+  display: inline-block; vertical-align: middle; margin-left: 6px;
+  padding: 4px 12px; border-radius: 99px; font-size: 13px; font-weight: 800; letter-spacing: 2px;
+  color: #190e14; background: linear-gradient(135deg, #ffd166, #ff9f1c);
+  -webkit-text-fill-color: #190e14;
+  box-shadow: 0 4px 20px rgba(255, 159, 28, 0.5);
+}
+html[data-channel="beta"] .beta-hero-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 99px; font-size: 11px; font-weight: 800; letter-spacing: .5px;
+  color: #ffd166; background: rgba(255, 159, 28, 0.14);
+  border: 1px solid rgba(255, 159, 28, 0.45);
+}
+html[data-channel="beta"] .verified-pill {
+  color: #ffd166; background: rgba(255, 159, 28, 0.14);
+  border-color: rgba(255, 159, 28, 0.45);
+}
+
 /* ---------- Toast ---------- */
 .toast {
   position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 30px);
