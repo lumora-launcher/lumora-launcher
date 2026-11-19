@@ -1,59 +1,159 @@
 <div align="center">
-  <img src="assets/icon.png" width="128" height="128" alt="Lumora Launcher Logo" />
-  <h1>Lumora Launcher</h1>
-  <p><strong>Modern, hızlı ve tamamen açık kaynaklı yeni nesil Minecraft Launcher</strong></p>
   <p>
-    <a href="https://github.com/lumora-launcher/lumora-launcher/releases">⬇ İndir (Releases)</a> ·
-    <a href="https://github.com/lumora-launcher/lumora-launcher/issues">🐞 Hata Bildir</a>
+    <img src="assets/icon.png" width="110" height="110" alt="Lumora Launcher Stable Icon" />
+    &nbsp;&nbsp;&nbsp;
+    <img src="assets/icon-beta.png" width="110" height="110" alt="Lumora Launcher Beta Icon" />
+  </p>
+  <h1>Lumora Launcher</h1>
+  <p><strong>Modern, fast, and 100% open-source Minecraft Launcher — Built with Electron</strong></p>
+  <p>
+    <img src="https://img.shields.io/badge/version-v1.2.1--beta-orange?style=for-the-badge" alt="Version" />
+    <img src="https://img.shields.io/badge/license-MIT-20d6a8?style=for-the-badge" alt="MIT License" />
+    <img src="https://img.shields.io/badge/platform-Windows%20x64-7c5cff?style=for-the-badge" alt="Windows x64" />
+    <img src="https://img.shields.io/badge/languages-7%20(TR%20|%20EN%20|%20DE%20|%20ES%20|%20RU%20|%20FR%20|%20PT)-38bdf8?style=for-the-badge" alt="7 Languages" />
+  </p>
+  <p>
+    <a href="https://github.com/lumora-launcher/lumora-launcher/releases">⬇ Download Releases</a> ·
+    <a href="#-english">🇬🇧 English</a> ·
+    <a href="#-türkçe">🇹🇷 Türkçe</a> ·
+    <a href="#-5-color-themes--5-renk-teması">🎨 Themes</a> ·
+    <a href="https://github.com/lumora-launcher/lumora-launcher/issues">🐞 Report Issue</a>
   </p>
 </div>
 
 ---
 
-## ✨ Neler Var? (v1.2.1-beta)
+## 📸 UI & Feature Showcase / Arayüz & Özellik Vitrini
 
-- **🗂️ İzole Profil (Instance) Yönetimi:** Ana oyun klasörünü bozmadan **Fabric**, **NeoForge**, **OptiFine**, **Forge**, **Quilt** ve **Vanilla** profillerini birbirinden bağımsız `mods`, `saves`, `shaderpacks` ve `config` klasörlerinde tut.
-- **🟢 Modrinth İçerik Mağazası & `.mrpack` Desteği:** Tarayıcıya ihtiyaç duymadan doğrudan launcher içinden **Mod**, **Modpack (`.mrpack`)**, **Shader** ve **Kaynak Paketi (Resource Pack)** ara, gerekli kütüphane bağımlılıklarıyla (*Fabric API* vb.) birlikte tek tıkla kur.
-- **📦 Modpack İçe & Dışa Aktarma:** Bilgisayarındaki `.mrpack` paketlerini tek tıkla yeni profil olarak içe aktar veya kendi hazırladığın mod paketini `.mrpack` olarak dışa aktar.
-- **📥 Başka Launcher'dan Profil Göçü (Import Wizard):** Bilgisayarındaki resmi `.minecraft`, **CurseForge**, **Prism Launcher**, **MultiMC** ve **Modrinth App** profillerini modları ve dünyalarıyla birlikte tek tıkla Lumora'ya kopyala.
-- **🌐 Canlı Sunucu Listesi & Tek Tıkla Bağlan (`QuickPlay`):** Favori sunucularının canlı oyuncu sayısını, ping (ms) süresini, MOTD açıklamasını ve ikonunu gör; ana menüyü beklemeden doğrudan sunucuya bağlan.
-- **🌍 Dünya (`saves`) Yöneticisi, ZIP Yedekleme & Ekran Görüntüsü Galerisi:** Tek oyunculu dünyalarına doğrudan gir, tek tıkla `.zip` yedeği al/geri yükle ve oyun içi `F2` ekran görüntülerini galeriden incele.
-- **👕 3B Skin & Karakter Stüdyosu:** Tam boy 3B karakter önizleme, oyuncu adına göre skin arama, `.png` olarak bilgisayara indirme ve orijinal Microsoft hesabına doğrudan `.png` skin yükleme (*Klasik/Steve* ve *İnce/Alex* modelleri).
-- **⚙️ Uygulama İçi Config & `options.txt` Düzenleyici:** Harici bir programa ihtiyaç duymadan aktif profilin `options.txt`, `optionsof.txt` ve `config/` altındaki (`.json`, `.toml`, `.properties`, `.cfg`, `.yml`, `.yaml`, `.txt`, `.ini`) ayar dosyalarını launcher içinden düzenleyip kaydetme.
-- **🔐 Microsoft (Xbox Live) & Çevrimdışı Hesap Desteği:** Resmi Microsoft hesabınla orijinal sunuculara gir veya çevrimdışı (offline) modda istediğin kullanıcı adıyla oyna.
-- **🔍 Akıllı Çökme (Crash) Analizcisi & `mclo.gs` Log Paylaşımı:** Oyun çöktüğünde logları ve `crash-reports` klasörünü tarayarak eksik modları, Java uyumsuzluğunu veya RAM yetersizliğini Türkçe açıklar; eksik kütüphaneyi Modrinth'te aratır ve erişim anahtarları otomatik gizlenmiş (`[GİZLENDİ]`) logları tek tıkla `mclo.gs` üzerinden paylaşır.
-- **⚡ JVM Hazır Optimizasyon Ayarları:** Tek tıkla *Aikar's Flags (G1GC)* ve *Düşük Sistem* JVM argüman profilleri.
-- **💬 Discord Rich Presence & Sistem Tepsisi (System Tray):** Oyun sırasında sağ alt tepsiye küçülme ve Discord profilinde oynadığın sürümü ve mod sayısını canlı gösterme desteği *(Discord Application ID yapılandırıldığında aktif olur)*.
-- **🎨 5 Renk Teması & 3 Arayüz Düzeni:** *Aurora*, *Zümrüt*, *Nether*, *Cyberpunk*, *Buzul* temaları ve *Modern*, *Sinematik Alt Bar*, *Minimalist* yerleşim düzenleri.
-- **☕ Akıllı Java & Ana Sürüm Denetimi:** Seçilen sürümün ihtiyaç duyduğu resmi Mojang Java sürümünü ve ana Vanilla dosyalarını otomatik denetler ve indirir.
-- **🔒 Güvenlik & Sessiz Otomatik Güncelleme:** Windows DPAPI (`safeStorage`) ile şifrelenmiş oturum saklama, SHA-512 imza doğrulamalı ve kurulum sihirbazı açmadan arka planda sessizce kendi kendini güncelleyen resmi GitHub güncelleyicisi.
+<p align="center">
+  <img src="assets/screenshots/hero-en.png" width="92%" alt="Lumora Launcher Home Screen (English UI)" />
+</p>
 
-## 🛠️ Geliştirici Kurulumu
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <strong>🧩 Isolated Instances & Managers</strong><br/>
+      <sub>Mods, Shaders, Resource Packs, World Backups & Config Editor</sub><br/><br/>
+      <img src="assets/screenshots/feature-instances.png" alt="Isolated Instances Manager" />
+    </td>
+    <td width="50%" align="center">
+      <strong>🟢 Modrinth Content Store</strong><br/>
+      <sub>1-Click Mods, Modpacks (.mrpack), Shaders & Auto-Dependencies</sub><br/><br/>
+      <img src="assets/screenshots/feature-modrinth.png" alt="Modrinth Store" />
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <strong>🌐 Live Server Ping & Quick Join</strong><br/>
+      <sub>Real-time player count, latency (ms), MOTD & direct launch</sub><br/><br/>
+      <img src="assets/screenshots/feature-servers.png" alt="Server List and Quick Join" />
+    </td>
+    <td width="50%" align="center">
+      <strong>👕 Built-in 3D Skin Studio (Alex & Steve)</strong><br/>
+      <sub>True 3px slim & 4px classic renderer, Mojang lookup, local & MS upload</sub><br/><br/>
+      <img src="assets/screenshots/feature-skin-studio.png" alt="3D Skin Studio" />
+    </td>
+  </tr>
+</table>
 
-Projeyi kendi bilgisayarında çalıştırmak veya derlemek için:
+---
+
+## 🎨 5 Color Themes / 5 Renk Teması
+
+<table>
+  <tr>
+    <td width="33.3%" align="center">
+      <strong>🌌 Aurora (Purple &amp; Teal)</strong><br/>
+      <img src="assets/screenshots/theme-aurora.png" alt="Aurora Theme" />
+    </td>
+    <td width="33.3%" align="center">
+      <strong>💚 Emerald / Zümrüt</strong><br/>
+      <img src="assets/screenshots/theme-emerald.png" alt="Emerald Theme" />
+    </td>
+    <td width="33.3%" align="center">
+      <strong>🔥 Nether (Crimson &amp; Magma)</strong><br/>
+      <img src="assets/screenshots/theme-nether.png" alt="Nether Theme" />
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <strong>⚡ Cyberpunk (Neon Pink &amp; Cyan)</strong><br/>
+      <img src="assets/screenshots/theme-cyber.png" alt="Cyberpunk Theme" />
+    </td>
+    <td width="50%" align="center">
+      <strong>❄️ Frost / Buzul (Sapphire Ice)</strong><br/>
+      <img src="assets/screenshots/theme-frost.png" alt="Frost Theme" />
+    </td>
+  </tr>
+</table>
+
+---
+
+## 🇬🇧 English
+
+### ✨ Key Features
+
+- **🗂️ Isolated Profile (Instance) Management:** Keep **Fabric**, **NeoForge**, **Forge**, **OptiFine**, **Quilt**, and **Vanilla** profiles completely separated with dedicated `mods`, `saves`, `shaderpacks`, and `config` directories — plus **1-Click Profile Duplication**, per-profile **RAM limits**, and automatic base Vanilla verification.
+- **🟢 Integrated Modrinth Store & `.mrpack` Support:** Browse, search, and install **Mods**, **Modpacks (`.mrpack`)**, **Shaders**, and **Resource Packs** without leaving the launcher. Automatically installs required dependencies (*Fabric API*, *Cloth Config*, etc.), checks SHA-1 mod updates, and supports `.mrpack` import/export.
+- **📥 Launcher Import Wizard:** Migrate existing profiles, mods, and worlds from official `.minecraft`, **CurseForge**, **Prism Launcher**, **MultiMC**, and **Modrinth App** in one click.
+- **👕 Built-in 3D Canvas Skin Studio (Steve 4px & Alex 3px):** Live Mojang API lookup, automatic 3px slim (*Alex*) vs 4px classic (*Steve*) arm rendering, legacy `64×32` hat fix, local `.png` skin picker, **1-click `CustomSkinLoader` install**, `.png` download, and direct Microsoft skin upload.
+- **⚙️ In-App Config & `options.txt` Editor:** Edit `options.txt`, `optionsof.txt`, and mod `config/` files (`.json`, `.toml`, `.properties`, `.cfg`, `.yml`) right inside the launcher.
+- **🌐 Live Server List & QuickPlay:** Inspect real-time server MOTD, icon, ping (ms), and player counts via Minecraft SLP, and join directly skipping the main menu.
+- **🌍 World Manager, ZIP Backups & Screenshot Gallery:** Launch directly into singleplayer worlds, create/restore `.zip` backups, and browse in-game `F2` screenshots.
+- **🔐 Microsoft (Xbox Live) & Offline Auth:** Sign in with your official Microsoft account (encrypted locally via Windows DPAPI `safeStorage`) or play in offline mode with model/UUID parity support.
+- **🔍 Smart Crash Analyzer & `mclo.gs` Log Share:** Detects missing library mods, Java mismatches, Mixin conflicts, or RAM limits in `latest.log` / `crash-reports`, and uploads token-redacted logs to `mclo.gs`.
+- **🌍 7 Built-in Languages:** Instant switching from the title bar between **🇹🇷 Türkçe**, **🇬🇧 English**, **🇩🇪 Deutsch**, **🇪🇸 Español**, **🇷🇺 Русский**, **🇫🇷 Français**, and **🇧🇷 Português**.
+- **🎨 Customizable UI:** 5 color themes (*Aurora*, *Emerald*, *Nether*, *Cyberpunk*, *Frost*), 3 layouts (*Modern Cards*, *Cinematic Dock*, *Minimal Focus*), animated splash intro, and JVM optimization presets (*Aikar's Flags*, *Low-End*).
+- **🔒 Silent Official Auto-Updater:** Locked strictly to the official `lumora-launcher/lumora-launcher` GitHub repository with SHA-512 verification and silent background installation.
+
+### 🧪 Separate Stable & Beta Channels
+
+Lumora can be packaged from the same codebase as **two independent Windows applications** that install side-by-side without overwriting each other:
+- **Stable (`com.lumora.launcher`):** Purple/Teal cube icon, `Lumora Launcher`.
+- **Beta (`com.lumora.launcher.beta`):** Solar Amber/Orange cube icon, `Lumora Launcher Beta`, with distinct `BETA` UI badges and pre-release update detection.
+
+### 🛠️ Developer Setup
 
 ```powershell
-# Bağımlılıkları yükle
+# Install dependencies
 npm.cmd install
 
-# Geliştirici modunda başlat
+# Run in development mode
 npm.cmd start
 
-# Windows kurulum paketi (.exe) oluştur
-npm.cmd run dist
+# Build Windows NSIS installer (.exe)
+npm.cmd run dist:stable   # Stable build (Lumora-Launcher-Setup-x.x.x.exe)
+npm.cmd run dist:beta     # Beta build (Lumora-Launcher-Beta-Setup-x.x.x-beta.exe)
 ```
 
-Kurulum dosyası (`Lumora-Launcher-Setup-1.2.1-beta.exe` ve `latest.yml`) `dist/` klasörüne oluşturulur.
+---
 
-## ⚖️ Yasal Uyarı & Bağımsızlık Beyanı (Disclaimer)
+## 🇹🇷 Türkçe
+
+### ✨ Neler Var? (v1.2.1-beta)
+
+- **🗂️ İzole Profil (Instance) Yönetimi:** Ana oyun klasörünü bozmadan **Fabric**, **NeoForge**, **OptiFine**, **Forge**, **Quilt** ve **Vanilla** profillerini birbirinden bağımsız `mods`, `saves`, `shaderpacks` ve `config` klasörlerinde tut; tek tıkla **Profili Çoğalt**, profile özel RAM seç ve ana sürümü otomatik denetle.
+- **🟢 Modrinth İçerik Mağazası & `.mrpack` Desteği:** Tarayıcıya ihtiyaç duymadan **Mod**, **Modpack (`.mrpack`)**, **Shader** ve **Kaynak Paketi** ara, gerekli bağımlılıklarıyla (*Fabric API* vb.) birlikte tek tıkla kur ve `.mrpack` içe/dışa aktar.
+- **📥 Başka Launcher'dan Profil Göçü:** Mevcut `.minecraft`, **CurseForge**, **Prism Launcher**, **MultiMC** ve **Modrinth App** profillerini tek tıkla Lumora'ya kopyala.
+- **👕 Dahili 3B Skin & Karakter Stüdyosu (Steve 4px & Alex 3px):** Resmi Mojang API sorgusu, otomatik **Alex (3px ince kol)** / **Steve (4px klasik kol)** 3B çizim, eski `64×32` şapka siyahlığı düzeltmesi, bilgisayardan özel `.png` seçme, tek tıkla `CustomSkinLoader` kurulumu ve Microsoft hesabına doğrudan skin yükleme.
+- **⚙️ Uygulama İçi Config & `options.txt` Düzenleyici:** Profilin `options.txt` ve `config/` altındaki (`.json`, `.toml`, `.properties`, `.cfg`, `.yml`) dosyalarını doğrudan arayüzden düzenle.
+- **🌐 Canlı Sunucu Listesi & Tek Tıkla Bağlan (`QuickPlay`):** Sunucuların canlı oyuncu sayısını, ping (ms) süresini ve MOTD açıklamasını gör; tek tıkla doğrudan bağlan.
+- **🌍 Dünya (`saves`) Yöneticisi, ZIP Yedekleme & Ekran Görüntüleri:** Tek oyunculu dünyalarını `.zip` olarak yedekle/geri yükle ve `F2` ekran görüntülerini galeriden incele.
+- **🔐 Microsoft (Xbox Live) & Çevrimdışı Hesap Desteği:** Resmi Microsoft oturumları Windows DPAPI (`safeStorage`) ile şifrelenerek saklanır.
+- **🔍 Akıllı Çökme Analizcisi & `mclo.gs` Log Paylaşımı:** Çökme sebeplerini Türkçe açıklar ve token bilgileri gizlenmiş logu tek tıkla `mclo.gs`'e yükler.
+- **🌍 7 Dil Desteği:** Üst başlıktan anında **🇹🇷 Türkçe**, **🇬🇧 English**, **🇩🇪 Deutsch**, **🇪🇸 Español**, **🇷🇺 Русский**, **🇫🇷 Français**, **🇧🇷 Português** arası geçiş yap.
+- **🧪 Normal & Beta Ayrı Kurulumlar:** Beta sürümleri altın-kehribar simgesi, `BETA` arayüz rozetleri ve ayrı Windows kurulum kimliğiyle (`com.lumora.launcher.beta`) normal sürümün üzerine yazmadan kurulur.
+
+---
+
+## ⚖️ Disclaimer / Yasal Uyarı
 
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
 
-- **Lumora Launcher**, tamamen özgün olarak geliştirilmiş, bağımsız ve topluluk odaklı, açık kaynaklı bir yazılımdır.
-- **Microsoft Corporation** veya **Mojang Studios** ile hiçbir resmi anlaşması, ortaklığı, sponsorluğu veya bağlantısı bulunmamaktadır.
-- "Minecraft" adı, markası ve oyun varlıkları Microsoft Corporation / Mojang Studios'a aittir.
-- Orijinal Microsoft hesabı ile giriş özelliği yalnızca kullanıcının kendi resmi Microsoft/Xbox Live OAuth2 oturumu üzerinden doğrudan Microsoft ve Minecraft sunucularıyla iletişim kurar; hiçbir üçüncü taraf sunucuya şifre veya hesap verisi gönderilmez ve yerel oturum anahtarları Windows DPAPI şifrelemesi ile korunur.
+- **Lumora Launcher** is a 100% independent, original, and open-source project licensed under the **MIT License**. It has **no affiliation, partnership, sponsorship, or agreement** with **Microsoft Corporation** or **Mojang Studios**.
+- **Lumora Launcher**, tamamen özgün olarak geliştirilmiş bağımsız ve açık kaynaklı bir yazılımdır. **Microsoft Corporation** veya **Mojang Studios** ile hiçbir resmi anlaşması, ortaklığı veya bağlantısı bulunmamaktadır.
+- "Minecraft" and all associated assets belong to Microsoft Corporation / Mojang Studios. Official Microsoft authentication communicates directly with Microsoft/Xbox Live OAuth2 and Minecraft Services endpoints; no credentials or tokens are ever sent to any third-party server.
 
-## 📄 Lisans
+## 📄 License / Lisans
 
-Bu proje **MIT Lisansı** ([LICENSE](LICENSE)) altında tamamen açık kaynak olarak sunulmaktadır.
+Released under the [MIT License](LICENSE).

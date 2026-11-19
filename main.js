@@ -61,6 +61,7 @@ function defaultSettings() {
     closeOnLaunch: true,
     minimizeToTray: true,
     discordRpc: true,
+    language: 'tr',
     offlineSkinModel: 'classic', // 'classic' | 'slim'
     customSkinDataUrl: '',
     jvmArgs: '',

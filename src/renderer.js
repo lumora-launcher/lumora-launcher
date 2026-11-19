@@ -166,8 +166,10 @@ function playSplashIntro(force = false) {
 function applyTheme(theme) {
   const t = THEME_LABELS[theme] ? theme : 'aurora';
   document.documentElement.setAttribute('data-theme', t);
-  $('activeThemeBadge').textContent = THEME_LABELS[t];
-  $('statTheme').textContent = THEME_LABELS[t];
+  const localizedThemes = window.LumoraI18n ? window.LumoraI18n.t('theme_names') : null;
+  const label = (localizedThemes && localizedThemes[t]) || THEME_LABELS[t];
+  $('activeThemeBadge').textContent = label;
+  $('statTheme').textContent = label;
 
   document.querySelectorAll('#themeGrid .theme-card').forEach((card) => {
     card.classList.toggle('active', card.dataset.theme === t);
@@ -565,15 +567,25 @@ async function resolveCanvasForSkinLookup(username, preferredFallbackModel = 'cl
 }
 
 function updateAccountBadgeAndAvatar(name, isMs) {
+  const lang = settings.language || 'tr';
+  const i18n = window.LumoraI18n;
   const badge = $('accountModeBadge');
   if (badge) {
-    badge.textContent = isMs ? '✓ ORİJİNAL' : 'ÇEVRİMDIŞI';
+    badge.textContent = i18n
+      ? i18n.t(isMs ? 'pill_original' : 'pill_offline')
+      : isMs
+      ? '✓ ORİJİNAL'
+      : 'ÇEVRİMDIŞI';
     badge.className = `account-mode-pill${isMs ? ' ms-active' : ''}`;
   }
   const cleanName = (name || '').trim();
-  const h = new Date().getHours();
-  const part = h < 6 ? 'İyi geceler' : h < 12 ? 'Günaydın' : h < 18 ? 'İyi günler' : 'İyi akşamlar';
-  $('greeting').textContent = cleanName ? `${part}, ${cleanName}` : `${part}!`;
+  if (i18n) {
+    $('greeting').textContent = i18n.getGreeting(lang, cleanName);
+  } else {
+    const h = new Date().getHours();
+    const part = h < 6 ? 'İyi geceler' : h < 12 ? 'Günaydın' : h < 18 ? 'İyi günler' : 'İyi akşamlar';
+    $('greeting').textContent = cleanName ? `${part}, ${cleanName}` : `${part}!`;
+  }
   $('avatarTag').textContent = cleanName || 'Steve';
 
   clearTimeout(avatarTimer);
@@ -2346,6 +2358,26 @@ window.api.onState((state) => {
 
 playBtn.onclick = () => launchWithQuickPlay();
 
+function applyActiveLanguage(lang) {
+  const chosen = window.LumoraI18n ? window.LumoraI18n.applyLanguage(lang) : 'tr';
+  settings.language = chosen;
+  const sel = $('titlebarLangSelect');
+  if (sel) sel.value = chosen;
+  applyTheme(settings.theme || 'aurora');
+  updateGreeting();
+  const isMs = settings.authMode === 'microsoft';
+  const badge = $('accountModeBadge');
+  if (badge && window.LumoraI18n) {
+    badge.textContent = window.LumoraI18n.t(isMs ? 'pill_original' : 'pill_offline');
+  }
+}
+
+$('titlebarLangSelect').addEventListener('change', (e) => {
+  const lang = e.target.value;
+  applyActiveLanguage(lang);
+  persist({ language: lang });
+});
+
 // ---------------- Başlangıç ----------------
 (async function init() {
   sys = await window.api.systemInfo();
@@ -2360,6 +2392,7 @@ playBtn.onclick = () => launchWithQuickPlay();
   $('appVersionBadge').textContent = `v${sys.appVersion}`;
   $('currentVerText').textContent = `v${sys.appVersion}`;
 
+  applyActiveLanguage(settings.language || 'tr');
   applyTheme(settings.theme || 'aurora');
   applyLayout(settings.layoutStyle || 'modern');
   $('animationsEnabled').checked = settings.animationsEnabled !== false;
