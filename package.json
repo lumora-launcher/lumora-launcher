@@ -1,7 +1,7 @@
 {
   "name": "lumora-launcher",
   "productName": "Lumora Launcher",
-  "version": "1.2.0",
+  "version": "1.2.1-beta",
   "description": "Modern, açık kaynaklı kişisel Minecraft Launcher",
   "homepage": "https://github.com/lumora-launcher/lumora-launcher",
   "repository": {

@@ -252,6 +252,317 @@ document.querySelectorAll('.stat[data-goto]').forEach((card) => {
 const USERNAME_RE = /^[A-Za-z0-9_]{3,16}$/;
 let avatarTimer = null;
 let savedMsAccounts = [];
+let lastAvatarLookupKey = '';
+
+// ---------------- Dahili 3B HTML5 Canvas Skin Motoru (Steve 4px & Alex 3px) ----------------
+function createFallbackSkinCanvas(model = 'classic') {
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 64;
+  const ctx = c.getContext('2d');
+  const isSlim = model === 'slim';
+  const skinCol = isSlim ? '#f4c7a5' : '#cfa07a';
+  const hairCol = isSlim ? '#d4742c' : '#3a2415';
+  const eyeCol = isSlim ? '#4e8a38' : '#4a47b5';
+  const shirtCol = isSlim ? '#6aa84f' : '#00a8a8';
+  const pantsCol = isSlim ? '#4d4137' : '#323299';
+  const shoeCol = isSlim ? '#3b332d' : '#555555';
+
+  // Kafa (8x8x8)
+  ctx.fillStyle = skinCol;
+  ctx.fillRect(0, 8, 32, 8);
+  ctx.fillRect(8, 0, 16, 8);
+  // Saç
+  ctx.fillStyle = hairCol;
+  ctx.fillRect(8, 0, 8, 8);
+  ctx.fillRect(24, 8, 8, 8);
+  ctx.fillRect(8, 8, 8, 2);
+  ctx.fillRect(0, 8, 8, 3);
+  ctx.fillRect(16, 8, 8, 3);
+  // Göz & Ağız
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(9, 12, 1, 1);
+  ctx.fillRect(14, 12, 1, 1);
+  ctx.fillStyle = eyeCol;
+  ctx.fillRect(10, 12, 1, 1);
+  ctx.fillRect(13, 12, 1, 1);
+  ctx.fillStyle = '#9e6246';
+  ctx.fillRect(11, 14, 2, 1);
+
+  // Gövde (shirt)
+  ctx.fillStyle = shirtCol;
+  ctx.fillRect(16, 20, 24, 12);
+  ctx.fillRect(20, 16, 16, 4);
+
+  // Bacaklar
+  ctx.fillStyle = pantsCol;
+  ctx.fillRect(0, 20, 16, 10);
+  ctx.fillRect(4, 16, 8, 4);
+  ctx.fillRect(16, 52, 16, 10);
+  ctx.fillRect(20, 48, 8, 4);
+  ctx.fillStyle = shoeCol;
+  ctx.fillRect(0, 30, 16, 2);
+  ctx.fillRect(16, 62, 16, 2);
+
+  // Kollar (Steve: 4px, Alex: 3px)
+  const aw = isSlim ? 3 : 4;
+  ctx.fillStyle = shirtCol;
+  ctx.fillRect(40, 20, aw * 2 + 8, 4);
+  ctx.fillRect(44, 16, aw * 2, 4);
+  ctx.fillRect(32, 52, aw * 2 + 8, 4);
+  ctx.fillRect(36, 48, aw * 2, 4);
+  ctx.fillStyle = skinCol;
+  ctx.fillRect(40, 24, aw * 2 + 8, 8);
+  ctx.fillRect(32, 56, aw * 2 + 8, 8);
+  return c;
+}
+
+function normalizeSkinToCanvas(img) {
+  const w = img.width || 64;
+  const h = img.height || 64;
+  const scale = Math.max(1, w / 64);
+  const size = Math.round(64 * scale);
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img, 0, 0);
+
+  // Eski 64x32 skinlerde Şapka bölgesinde (32,0,32,16) şeffaflık yoksa (Notch gibi katı siyah arka planlı PNG'ler),
+  // Minecraft ImageBufferDownload kuralına uygun olarak şapka katmanını temizle
+  const hatX = Math.round(32 * scale);
+  const hatW = Math.round(32 * scale);
+  const hatH = Math.round(16 * scale);
+  const hatData = ctx.getImageData(hatX, 0, hatW, hatH).data;
+  let hatHasAlpha = false;
+  for (let i = 3; i < hatData.length; i += 4) {
+    if (hatData[i] < 255) {
+      hatHasAlpha = true;
+      break;
+    }
+  }
+  if (!hatHasAlpha) {
+    ctx.clearRect(hatX, 0, hatW, hatH);
+  }
+
+  // Eski 64x32 formatını 64x64'e aynalayarak dönüştür
+  if (h < w) {
+    const copyFlip = (sx, sy, sw, sh, dx, dy) => {
+      ctx.save();
+      ctx.translate((dx + sw) * scale, dy * scale);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, sx * scale, sy * scale, sw * scale, sh * scale, 0, 0, sw * scale, sh * scale);
+      ctx.restore();
+    };
+    // Sağ bacak -> Sol bacak (16,48)
+    copyFlip(4, 16, 4, 4, 20, 48);
+    copyFlip(8, 16, 4, 4, 24, 48);
+    copyFlip(8, 20, 4, 12, 16, 52);
+    copyFlip(4, 20, 4, 12, 20, 52);
+    copyFlip(0, 20, 4, 12, 24, 52);
+    copyFlip(12, 20, 4, 12, 28, 52);
+    // Sağ kol -> Sol kol (32,48)
+    copyFlip(44, 16, 4, 4, 36, 48);
+    copyFlip(48, 16, 4, 4, 40, 48);
+    copyFlip(48, 20, 4, 12, 32, 52);
+    copyFlip(44, 20, 4, 12, 36, 52);
+    copyFlip(40, 20, 4, 12, 40, 52);
+    copyFlip(52, 20, 4, 12, 44, 52);
+  }
+  return c;
+}
+
+function renderSkinHeadToDataUrl(skinCanvas) {
+  const s = skinCanvas.width / 64;
+  const out = document.createElement('canvas');
+  out.width = 128;
+  out.height = 128;
+  const ctx = out.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  // Yüz (8,8,8,8) + Şapka katmanı (40,8,8,8)
+  ctx.drawImage(skinCanvas, 8 * s, 8 * s, 8 * s, 8 * s, 6, 6, 116, 116);
+  ctx.drawImage(skinCanvas, 40 * s, 8 * s, 8 * s, 8 * s, 0, 0, 128, 128);
+  return out.toDataURL('image/png');
+}
+
+function buildCharacterBoxes(model, isLegacy) {
+  const isSlim = model === 'slim';
+  const aw = isSlim ? 3 : 4;
+  const armCenter = 4 + aw / 2;
+
+  const armFaces = (bx, by, w) => ({
+    top: [bx + 4, by, w, 4],
+    bottom: [bx + 4 + w, by, w, 4],
+    right: [bx, by + 4, 4, 12],
+    front: [bx + 4, by + 4, w, 12],
+    left: [bx + 4 + w, by + 4, 4, 12],
+    back: [bx + 8 + w, by + 4, w, 12]
+  });
+
+  const legOrBodyFaces = (bx, by, w, h, d) => ({
+    top: [bx + d, by, w, d],
+    bottom: [bx + d + w, by, w, d],
+    right: [bx, by + d, d, h],
+    front: [bx + d, by + d, w, h],
+    left: [bx + d + w, by + d, d, h],
+    back: [bx + d + w + d, by + d, w, h]
+  });
+
+  const boxes = [
+    { name: 'head', pivot: [0, -8, 0], min: [-4, -8, -4], max: [4, 0, 4], rx: 0, overlay: false, uv: legOrBodyFaces(0, 0, 8, 8, 8) },
+    { name: 'hat', pivot: [0, -8, 0], min: [-4.55, -8.55, -4.55], max: [4.55, 0.55, 4.55], rx: 0, overlay: true, uv: legOrBodyFaces(32, 0, 8, 8, 8) },
+    { name: 'body', pivot: [0, -8, 0], min: [-4, 0, -2], max: [4, 12, 2], rx: 0, overlay: false, uv: legOrBodyFaces(16, 16, 8, 12, 4) },
+    { name: 'rleg', pivot: [-2, 4, 0], min: [-2, 0, -2], max: [2, 12, 2], rx: -1, overlay: false, uv: legOrBodyFaces(0, 16, 4, 12, 4) },
+    { name: 'lleg', pivot: [2, 4, 0], min: [-2, 0, -2], max: [2, 12, 2], rx: 1, overlay: false, uv: legOrBodyFaces(16, 48, 4, 12, 4) },
+    { name: 'rarm', pivot: [-armCenter, -6, 0], min: [-aw / 2, -2, -2], max: [aw / 2, 10, 2], rx: 1, overlay: false, uv: armFaces(40, 16, aw) },
+    { name: 'larm', pivot: [armCenter, -6, 0], min: [-aw / 2, -2, -2], max: [aw / 2, 10, 2], rx: -1, overlay: false, uv: armFaces(32, 48, aw) }
+  ];
+
+  if (!isLegacy) {
+    boxes.push(
+      { name: 'jacket', pivot: [0, -8, 0], min: [-4.45, -0.45, -2.45], max: [4.45, 12.45, 2.45], rx: 0, overlay: true, uv: legOrBodyFaces(16, 32, 8, 12, 4) },
+      { name: 'rpants', pivot: [-2, 4, 0], min: [-2.45, -0.45, -2.45], max: [2.45, 12.45, 2.45], rx: -1, overlay: true, uv: legOrBodyFaces(0, 32, 4, 12, 4) },
+      { name: 'lpants', pivot: [2, 4, 0], min: [-2.45, -0.45, -2.45], max: [2.45, 12.45, 2.45], rx: 1, overlay: true, uv: legOrBodyFaces(0, 48, 4, 12, 4) },
+      { name: 'rsleeve', pivot: [-armCenter, -6, 0], min: [-aw / 2 - 0.45, -2.45, -2.45], max: [aw / 2 + 0.45, 10.45, 2.45], rx: 1, overlay: true, uv: armFaces(40, 32, aw) },
+      { name: 'lsleeve', pivot: [armCenter, -6, 0], min: [-aw / 2 - 0.45, -2.45, -2.45], max: [aw / 2 + 0.45, 10.45, 2.45], rx: -1, overlay: true, uv: armFaces(48, 48, aw) }
+    );
+  }
+  return boxes;
+}
+
+function renderSkinBodyToCanvas(canvas, skinCanvas, { model = 'classic', viewAngle = 'front', walkPose = true } = {}) {
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const yaw = viewAngle === 'back' ? Math.PI + 0.48 : 0.48;
+  const pitch = -0.22;
+  const cosY = Math.cos(yaw);
+  const sinY = Math.sin(yaw);
+  const cosP = Math.cos(pitch);
+  const sinP = Math.sin(pitch);
+  const scale = Math.min(canvas.width / 28, canvas.height / 38);
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2 + scale * 0.5;
+  const s = skinCanvas.width / 64;
+  const swingAngle = walkPose ? 0.46 : 0;
+
+  const transformPoint = (pt, pivot, limbRx) => {
+    let [lx, ly, lz] = pt;
+    if (limbRx !== 0) {
+      const c = Math.cos(limbRx);
+      const sn = Math.sin(limbRx);
+      const ny = ly * c - lz * sn;
+      const nz = ly * sn + lz * c;
+      ly = ny;
+      lz = nz;
+    }
+    const wx = lx + pivot[0];
+    const wy = ly + pivot[1];
+    const wz = lz + pivot[2];
+
+    const x1 = wx * cosY + wz * sinY;
+    const z1 = -wx * sinY + wz * cosY;
+    const y2 = wy * cosP - z1 * sinP;
+    const z2 = wy * sinP + z1 * cosP;
+    return [cx + x1 * scale, cy + y2 * scale, z2];
+  };
+
+  const quadDefs = (min, max) => {
+    const [x0, y0, z0] = min;
+    const [x1, y1, z1] = max;
+    return [
+      { key: 'front', shade: 0.03, pts: [[x0, y0, z1], [x1, y0, z1], [x0, y1, z1], [x1, y1, z1]] },
+      { key: 'back', shade: 0.14, pts: [[x1, y0, z0], [x0, y0, z0], [x1, y1, z0], [x0, y1, z0]] },
+      { key: 'right', shade: 0.12, pts: [[x0, y0, z0], [x0, y0, z1], [x0, y1, z0], [x0, y1, z1]] },
+      { key: 'left', shade: 0.12, pts: [[x1, y0, z1], [x1, y0, z0], [x1, y1, z1], [x1, y1, z0]] },
+      { key: 'top', shade: 0, pts: [[x0, y0, z0], [x1, y0, z0], [x0, y0, z1], [x1, y0, z1]] },
+      { key: 'bottom', shade: 0.25, pts: [[x0, y1, z1], [x1, y1, z1], [x0, y1, z0], [x1, y1, z0]] }
+    ];
+  };
+
+  const facesToDraw = [];
+  const boxes = buildCharacterBoxes(model, false);
+
+  for (const box of boxes) {
+    const rx = box.rx * swingAngle;
+    for (const q of quadDefs(box.min, box.max)) {
+      const proj = q.pts.map((p) => transformPoint(p, box.pivot, rx));
+      const p0 = proj[0];
+      const p1 = proj[1];
+      const p2 = proj[2];
+      const ux = p1[0] - p0[0];
+      const uy = p1[1] - p0[1];
+      const vx = p2[0] - p0[0];
+      const vy = p2[1] - p0[1];
+      const cross = ux * vy - uy * vx;
+      if (cross <= 0.1) continue;
+
+      const avgZ = (proj[0][2] + proj[1][2] + proj[2][2] + proj[3][2]) / 4 + (box.overlay ? 0.02 : 0);
+      facesToDraw.push({
+        p0,
+        ux,
+        uy,
+        vx,
+        vy,
+        avgZ,
+        shade: q.shade,
+        overlay: box.overlay,
+        uv: box.uv[q.key]
+      });
+    }
+  }
+
+  facesToDraw.sort((a, b) => a.avgZ - b.avgZ);
+
+  for (const f of facesToDraw) {
+    const [sx, sy, sw, sh] = f.uv;
+    if (!sw || !sh) continue;
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.transform(f.ux / sw, f.uy / sw, f.vx / sh, f.vy / sh, f.p0[0], f.p0[1]);
+    ctx.drawImage(skinCanvas, sx * s, sy * s, sw * s, sh * s, 0, 0, sw, sh);
+    if (!f.overlay && f.shade > 0) {
+      ctx.fillStyle = `rgba(0,0,0,${f.shade})`;
+      ctx.fillRect(0, 0, sw, sh);
+    }
+    ctx.restore();
+  }
+}
+
+function loadImageElement(src) {
+  return new Promise((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = reject;
+    im.src = src;
+  });
+}
+
+async function resolveCanvasForSkinLookup(username, preferredFallbackModel = 'classic') {
+  const clean = (String(username || '').trim() || 'Steve').replace(/[^A-Za-z0-9_]/g, '') || 'Steve';
+  const res = await window.api.lookupSkin({ username: clean });
+  let model = res && res.model ? res.model : preferredFallbackModel;
+  let skinCanvas = null;
+
+  if (res && res.skinDataUrl) {
+    try {
+      const img = await loadImageElement(res.skinDataUrl);
+      skinCanvas = normalizeSkinToCanvas(img);
+    } catch {}
+  }
+  if (!skinCanvas) {
+    skinCanvas = createFallbackSkinCanvas(model);
+  }
+  return {
+    found: !!(res && res.found),
+    name: (res && res.name) || clean,
+    uuid: (res && res.uuid) || null,
+    model,
+    skinCanvas,
+    skinDataUrl: res ? res.skinDataUrl : null
+  };
+}
 
 function updateAccountBadgeAndAvatar(name, isMs) {
   const badge = $('accountModeBadge');
@@ -266,9 +577,25 @@ function updateAccountBadgeAndAvatar(name, isMs) {
   $('avatarTag').textContent = cleanName || 'Steve';
 
   clearTimeout(avatarTimer);
-  avatarTimer = setTimeout(() => {
+  avatarTimer = setTimeout(async () => {
     const valid = USERNAME_RE.test(cleanName);
-    $('avatar').src = `https://mc-heads.net/avatar/${valid ? cleanName : 'Steve'}/128`;
+    const targetName = valid ? cleanName : 'Steve';
+    const useCustomLocal = !isMs && settings.customSkinDataUrl;
+    const lookupKey = useCustomLocal ? `custom:${settings.customSkinDataUrl.slice(-24)}` : targetName.toLowerCase();
+    if (lookupKey === lastAvatarLookupKey) return;
+    lastAvatarLookupKey = lookupKey;
+
+    try {
+      if (useCustomLocal) {
+        const img = await loadImageElement(settings.customSkinDataUrl);
+        $('avatar').src = renderSkinHeadToDataUrl(normalizeSkinToCanvas(img));
+        return;
+      }
+      const resolved = await resolveCanvasForSkinLookup(targetName, settings.offlineSkinModel || 'classic');
+      $('avatar').src = renderSkinHeadToDataUrl(resolved.skinCanvas);
+    } catch {
+      $('avatar').src = renderSkinHeadToDataUrl(createFallbackSkinCanvas(settings.offlineSkinModel || 'classic'));
+    }
   }, 250);
 }
 
@@ -545,6 +872,7 @@ async function renderActiveInstanceDetails() {
   $('detailInstName').textContent = `${inst.name} — Kurulu İçerikler`;
   $('detailInstBadge').textContent = `${LOADER_LABELS[inst.loader]} ${inst.mcVersion}`;
   $('detailInstPath').textContent = `İzole Klasör: ${inst.dir}`;
+  $('instRamSelect').value = String(inst.ramMax || 0);
   $('btnInstallFpsPack').style.display = inst.loader === 'fabric' || inst.loader === 'quilt' ? 'inline-block' : 'none';
 
   const baseBadge = $('detailBaseStatusBadge');
@@ -720,6 +1048,25 @@ $('btnExportMrpack').onclick = async () => {
   if (res.canceled) return;
   if (!res.ok) return toast(res.error, true);
   toast(`Profil .mrpack olarak dışa aktarıldı!`);
+};
+
+$('btnDuplicateInstance').onclick = async () => {
+  const inst = getActiveInstance();
+  if (!inst) return;
+  const res = await window.api.duplicateInstance(inst.id);
+  if (!res.ok) return toast(res.error || 'Profil çoğaltılamadı', true);
+  activeInstanceId = res.instance.id;
+  toast(`"${res.instance.name}" profili oluşturuldu! ✓`);
+  await refreshInstances();
+};
+
+$('instRamSelect').onchange = async (e) => {
+  const inst = getActiveInstance();
+  if (!inst) return;
+  const ramMax = Number(e.target.value) || 0;
+  await window.api.updateInstance({ id: inst.id, ramMax });
+  toast(ramMax > 0 ? `${inst.name} için RAM ${gb(ramMax)} olarak ayarlandı` : `${inst.name} genel RAM ayarını kullanacak`);
+  await refreshInstances();
 };
 
 // Başka Launcher'dan Profil Göçü (Import Wizard)
@@ -1622,15 +1969,57 @@ const TASK_NAMES = {
   'classes-maven-custom': 'Forge kütüphaneleri indiriliyor'
 };
 
-// ---------------- Skin & Karakter Stüdyosu ----------------
+// ---------------- Skin & Karakter Stüdyosu (Dahili 3B Motor + Alex/Steve + Mojang API) ----------------
 let activeSkinPreviewName = 'Steve';
+let skinStudioCanvas = null;
+let skinStudioModel = 'classic';
+let skinViewAngle = 'front';
+let skinWalkPose = true;
 
-function updateSkinStudioPreview(rawName) {
+function renderSkinStudioFrame() {
+  const canvas = $('skinFullBodyCanvas');
+  if (!canvas || !skinStudioCanvas) return;
+  renderSkinBodyToCanvas(canvas, skinStudioCanvas, {
+    model: skinStudioModel,
+    viewAngle: skinViewAngle,
+    walkPose: skinWalkPose
+  });
+  $('skinDetectedModelBadge').textContent =
+    skinStudioModel === 'slim' ? 'Model: Alex (İnce 3px Kol)' : 'Model: Steve (Klasik 4px)';
+  $('skinBustImg').src = renderSkinHeadToDataUrl(skinStudioCanvas);
+  $('btnSkinToggleWalk').classList.toggle('accent-border', skinWalkPose);
+}
+
+async function updateSkinStudioPreview(rawName, useLocalIfEmpty = false) {
   const clean = (String(rawName || '').trim() || 'Steve').replace(/[^A-Za-z0-9_]/g, '') || 'Steve';
   activeSkinPreviewName = clean;
   $('skinStudioPreviewLabel').textContent = clean;
-  $('skinFullBody').src = `https://mc-heads.net/body/${encodeURIComponent(clean)}/180`;
-  $('skinBustImg').src = `https://mc-heads.net/avatar/${encodeURIComponent(clean)}/64`;
+  $('skinMetaSubLabel').textContent = 'Mojang API aranıyor...';
+
+  if (useLocalIfEmpty && settings.customSkinDataUrl) {
+    try {
+      const img = await loadImageElement(settings.customSkinDataUrl);
+      skinStudioCanvas = normalizeSkinToCanvas(img);
+      skinStudioModel = settings.offlineSkinModel || 'classic';
+      $('skinMetaSubLabel').textContent = 'Özel yerel PNG skin aktif';
+      renderSkinStudioFrame();
+      return;
+    } catch {}
+  }
+
+  const resolved = await resolveCanvasForSkinLookup(clean, settings.offlineSkinModel || 'classic');
+  skinStudioCanvas = resolved.skinCanvas;
+  skinStudioModel = resolved.model;
+  $('skinStudioPreviewLabel').textContent = resolved.name;
+  $('skinMetaSubLabel').textContent = resolved.found
+    ? `Mojang resmi profil · ${resolved.model === 'slim' ? 'Alex (İnce)' : 'Steve (Klasik)'}`
+    : 'Mojang kaydı yok (Varsayılan / Çevrimdışı model)';
+  renderSkinStudioFrame();
+}
+
+function syncSkinStudioControls() {
+  $('offlineSkinModelSelect').value = settings.offlineSkinModel || 'classic';
+  $('btnClearLocalSkin').classList.toggle('hidden', !settings.customSkinDataUrl);
 }
 
 function openSkinStudio() {
@@ -1639,7 +2028,8 @@ function openSkinStudio() {
       ? settings.username || 'Steve'
       : $('username').value.trim() || settings.username || 'Steve';
   $('skinSearchInput').value = curName;
-  updateSkinStudioPreview(curName);
+  syncSkinStudioControls();
+  updateSkinStudioPreview(curName, true);
   $('skinStudioModal').classList.remove('hidden');
 }
 
@@ -1662,10 +2052,105 @@ $('configEditorModal').addEventListener('click', (e) => {
   }
 });
 
-$('btnSkinPreview').onclick = () => updateSkinStudioPreview($('skinSearchInput').value);
+$('btnSkinFlipView').onclick = () => {
+  skinViewAngle = skinViewAngle === 'front' ? 'back' : 'front';
+  renderSkinStudioFrame();
+};
+
+$('btnSkinToggleWalk').onclick = () => {
+  skinWalkPose = !skinWalkPose;
+  renderSkinStudioFrame();
+};
+
+$('btnSkinPreview').onclick = () => updateSkinStudioPreview($('skinSearchInput').value, false);
 $('skinSearchInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') updateSkinStudioPreview($('skinSearchInput').value);
+  if (e.key === 'Enter') updateSkinStudioPreview($('skinSearchInput').value, false);
 });
+
+$('offlineSkinModelSelect').addEventListener('change', (e) => {
+  const m = e.target.value === 'slim' ? 'slim' : 'classic';
+  settings.offlineSkinModel = m;
+  settings.offlineSkinModelOverride = true;
+  skinStudioModel = m;
+  persist({ offlineSkinModel: m, offlineSkinModelOverride: true });
+  if (!skinStudioCanvas || $('skinMetaSubLabel').textContent.includes('Varsayılan')) {
+    skinStudioCanvas = createFallbackSkinCanvas(m);
+  }
+  renderSkinStudioFrame();
+  lastAvatarLookupKey = '';
+  updateGreeting();
+  toast(m === 'slim' ? 'Çevrimdışı model: Alex (İnce Kol) seçildi ✓' : 'Çevrimdışı model: Steve (Klasik) seçildi ✓');
+});
+
+$('btnPickLocalSkin').onclick = async () => {
+  const res = await window.api.pickLocalSkinPng({});
+  if (res.canceled) return;
+  if (!res.ok) return toast(res.error || 'Skin seçilemedi', true);
+  settings.customSkinDataUrl = res.skinDataUrl;
+  settings.offlineSkinModel = res.model;
+  settings.offlineSkinModelOverride = true;
+  syncSkinStudioControls();
+  const img = await loadImageElement(res.skinDataUrl);
+  skinStudioCanvas = normalizeSkinToCanvas(img);
+  skinStudioModel = res.model;
+  $('skinMetaSubLabel').textContent = `Yerel PNG skin (${res.model === 'slim' ? 'Alex' : 'Steve'})`;
+  renderSkinStudioFrame();
+  lastAvatarLookupKey = '';
+  updateGreeting();
+  toast(`Özel skin yüklendi (Algılanan model: ${res.model === 'slim' ? 'Alex' : 'Steve'}) ✓`);
+};
+
+$('btnClearLocalSkin').onclick = async () => {
+  await window.api.clearLocalSkinPng();
+  settings.customSkinDataUrl = '';
+  syncSkinStudioControls();
+  lastAvatarLookupKey = '';
+  await updateSkinStudioPreview($('skinSearchInput').value, false);
+  updateGreeting();
+  toast('Özel yerel skin temizlendi');
+};
+
+$('btnInstallSkinMod').onclick = async () => {
+  const inst = getActiveInstance();
+  if (!inst) return;
+  if (inst.loader === 'vanilla' || inst.loader === 'optifine') {
+    return toast('CustomSkinLoader modu için Fabric, Forge, NeoForge veya Quilt profili seçmelisin!', true);
+  }
+  const btn = $('btnInstallSkinMod');
+  btn.disabled = true;
+  btn.textContent = '⏳ CustomSkinLoader Aranıyor...';
+  try {
+    const searchRes = await window.api.modrinthSearch({
+      query: 'CustomSkinLoader',
+      projectType: 'mod',
+      mcVersion: inst.mcVersion,
+      loader: inst.loader,
+      limit: 5
+    });
+    const hit = (searchRes.hits || []).find((h) => /customskinloader/i.test(h.slug || h.title)) || (searchRes.hits || [])[0];
+    if (!hit) {
+      $('skinStudioModal').classList.add('hidden');
+      $('modrinthSearchInput').value = 'skin';
+      navigateTo('modrinth');
+      runModrinthSearch(false);
+      return toast(`${inst.mcVersion} (${LOADER_LABELS[inst.loader]}) için alternatif skin modları gösteriliyor.`);
+    }
+    const instRes = await window.api.modrinthInstall({
+      instanceId: inst.id,
+      projectId: hit.project_id,
+      title: hit.title,
+      iconUrl: hit.icon_url,
+      author: hit.author,
+      projectType: 'mod'
+    });
+    if (!instRes.ok) return toast(instRes.error, true);
+    toast(`${hit.title} aktif profile (${inst.name}) kuruldu! ✓`);
+    await refreshInstances();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🧩 Aktif Profile Skin Modu (CustomSkinLoader) Kur';
+  }
+};
 
 $('btnSkinUseName').onclick = async () => {
   const name = ($('skinSearchInput').value.trim() || activeSkinPreviewName || 'Steve').slice(0, 16);
@@ -1674,12 +2159,16 @@ $('btnSkinUseName').onclick = async () => {
   }
   settings.authMode = 'offline';
   settings.username = name;
+  settings.offlineSkinModel = skinStudioModel;
+  settings.offlineSkinModelOverride = false;
   $('username').value = name;
   await window.api.selectAccount({ authMode: 'offline', accountId: settings.activeAccountId });
-  persist({ username: name, authMode: 'offline' });
+  persist({ username: name, authMode: 'offline', offlineSkinModel: skinStudioModel, offlineSkinModelOverride: false });
+  syncSkinStudioControls();
+  lastAvatarLookupKey = '';
   await refreshAccountsUI();
   $('skinStudioModal').classList.add('hidden');
-  toast(`Kullanıcı adı "${name}" olarak ayarlandı ✓`);
+  toast(`Kullanıcı adı "${name}" (${skinStudioModel === 'slim' ? 'Alex' : 'Steve'}) olarak ayarlandı ✓`);
 };
 
 $('btnSkinDownloadPng').onclick = async () => {
@@ -1701,8 +2190,9 @@ $('btnSkinUploadMs').onclick = async () => {
     if (!res.ok) return toast(res.error || 'Skin yüklenemedi', true);
     toast(`${res.accountName} hesabına yeni skin başarıyla yüklendi! 🎉`);
     if (res.accountName) {
-      updateSkinStudioPreview(res.accountName);
-      $('avatar').src = `https://mc-heads.net/avatar/${encodeURIComponent(res.accountName)}/128?t=${Date.now()}`;
+      lastAvatarLookupKey = '';
+      await updateSkinStudioPreview(res.accountName, false);
+      updateGreeting();
     }
   } finally {
     btn.disabled = false;
@@ -1875,9 +2365,7 @@ playBtn.onclick = () => launchWithQuickPlay();
   $('username').value = settings.username || '';
   validateUsername();
   updateGreeting();
-  if (USERNAME_RE.test(settings.username || '')) {
-    $('avatar').src = `https://mc-heads.net/avatar/${settings.username}/128`;
-  }
+  syncSkinStudioControls();
 
   // RAM kaydırıcısı
   const slider = $('ramSlider');

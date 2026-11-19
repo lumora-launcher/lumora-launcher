@@ -60,6 +60,8 @@ function defaultSettings() {
     closeOnLaunch: true,
     minimizeToTray: true,
     discordRpc: true,
+    offlineSkinModel: 'classic', // 'classic' | 'slim'
+    customSkinDataUrl: '',
     jvmArgs: '',
     theme: 'aurora',
     layoutStyle: 'modern',
@@ -534,6 +536,50 @@ ipcMain.handle('instances:delete', (_e, id) => {
     saveSettings({ ...s, activeInstanceId: list[0].id, version: list[0].mcVersion });
   }
   return { ok: true, activeId: list[0].id };
+});
+
+ipcMain.handle('instances:duplicate', (_e, id) => {
+  try {
+    const list = loadInstances();
+    const src = list.find((x) => x.id === id);
+    if (!src) return { ok: false, error: 'Kopyalanacak profil bulunamadı.' };
+
+    const newId = 'inst-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+    const copyInst = {
+      ...src,
+      id: newId,
+      name: `${src.name} (Kopya)`.slice(0, 42),
+      createdAt: Date.now(),
+      lastPlayed: 0,
+      playTimeMs: 0
+    };
+    list.unshift(copyInst);
+    saveInstances(list);
+
+    const srcDir = getInstanceDir(src.id);
+    const destDir = getInstanceDir(newId);
+    for (const sub of ['mods', 'config', 'shaderpacks', 'resourcepacks', 'screenshots']) {
+      const subSrc = path.join(srcDir, sub);
+      if (fs.existsSync(subSrc)) {
+        copyFolderRecursiveSync(subSrc, path.join(destDir, sub));
+      } else {
+        fs.mkdirSync(path.join(destDir, sub), { recursive: true });
+      }
+    }
+    for (const extraDir of ['saves', 'backups']) {
+      fs.mkdirSync(path.join(destDir, extraDir), { recursive: true });
+    }
+    for (const f of ['options.txt', 'optionsof.txt', '.lumora-content.json']) {
+      const fSrc = path.join(srcDir, f);
+      if (fs.existsSync(fSrc)) fs.copyFileSync(fSrc, path.join(destDir, f));
+    }
+
+    const s = loadSettings();
+    saveSettings({ ...s, activeInstanceId: newId, version: copyInst.mcVersion });
+    return { ok: true, instance: enrichInstance(copyInst) };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
 });
 
 ipcMain.handle('instances:openFolder', (_e, id, subFolder) => {
@@ -1398,13 +1444,21 @@ ipcMain.handle('servers:ping', (_e, address) => pingMinecraftServer(address));
 
 // ---------------- Otomatik Güncelleyici (Sabit Resmi GitHub Deposu) ----------------
 function compareSemver(a, b) {
-  const clean = (v) => String(v || '').replace(/^v/i, '').split('-')[0].split('.').map((n) => parseInt(n, 10) || 0);
-  const pa = clean(a);
-  const pb = clean(b);
+  const parse = (v) => {
+    const raw = String(v || '').replace(/^v/i, '').trim();
+    const [core, pre] = raw.split('-', 2);
+    const nums = core.split('.').map((n) => parseInt(n, 10) || 0);
+    return { nums, pre: pre || '' };
+  };
+  const pa = parse(a);
+  const pb = parse(b);
   for (let i = 0; i < 3; i++) {
-    if ((pa[i] || 0) > (pb[i] || 0)) return 1;
-    if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+    const diff = (pa.nums[i] || 0) - (pb.nums[i] || 0);
+    if (diff !== 0) return diff > 0 ? 1 : -1;
   }
+  if (!pa.pre && pb.pre) return 1;
+  if (pa.pre && !pb.pre) return -1;
+  if (pa.pre && pb.pre) return pa.pre.localeCompare(pb.pre, undefined, { numeric: true });
   return 0;
 }
 
@@ -1451,6 +1505,7 @@ function cleanReleaseNotes(raw) {
 function setupAutoUpdater() {
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.allowPrerelease = true;
 
   autoUpdater.on('checking-for-update', () => {
     send('update:event', { state: 'checking', message: 'Resmi GitHub sunucusundan güncellemeler denetleniyor...' });
@@ -1498,7 +1553,7 @@ function setupAutoUpdater() {
   });
 }
 
-async function downloadInstallerDirectly(exeUrl) {
+async function downloadInstallerDirectly(exeUrl, ymlUrlOverride = null) {
   const dest = path.join(app.getPath('temp'), `Lumora-Launcher-Update-${Date.now()}.exe`);
   const res = await fetch(exeUrl, { headers: { 'User-Agent': USER_AGENT } });
   if (!res.ok) throw new Error(`İndirme hatası (HTTP ${res.status})`);
@@ -1523,15 +1578,27 @@ async function downloadInstallerDirectly(exeUrl) {
 
   const fileBuf = Buffer.concat(chunks);
 
-  // Güvenlik: resmi Release'teki latest.yml içindeki SHA-512 ile doğrula
-  const ymlRes = await fetch(
+  // Güvenlik: resmi Release'teki latest.yml / beta.yml içindeki SHA-512 ile doğrula
+  const ymlCandidates = [
+    ymlUrlOverride,
     `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/latest.yml`,
-    { headers: { 'User-Agent': USER_AGENT } }
-  );
-  if (!ymlRes.ok) {
+    `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/beta.yml`
+  ].filter(Boolean);
+
+  let ymlText = null;
+  for (const ymlCandidate of ymlCandidates) {
+    try {
+      const ymlRes = await fetch(ymlCandidate, { headers: { 'User-Agent': USER_AGENT } });
+      if (ymlRes.ok) {
+        ymlText = await ymlRes.text();
+        break;
+      }
+    } catch {}
+  }
+
+  if (!ymlText) {
     throw new Error('Güncelleme doğrulama dosyası (latest.yml) bulunamadı, kurulum güvenlik nedeniyle iptal edildi.');
   }
-  const ymlText = await ymlRes.text();
   const shaMatch = ymlText.match(/^sha512:\s*(\S+)/m);
   const actualSha = crypto.createHash('sha512').update(fileBuf).digest('base64');
   if (!shaMatch || shaMatch[1] !== actualSha) {
@@ -1552,7 +1619,7 @@ async function downloadInstallerDirectly(exeUrl) {
 }
 
 async function checkOfficialGithubRelease() {
-  const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
+  const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases?per_page=10`;
   const currentVer = getAppVersion();
   const res = await fetch(apiUrl, {
     headers: { 'User-Agent': `${APP_NAME}-Launcher/${currentVer}` }
@@ -1568,22 +1635,39 @@ async function checkOfficialGithubRelease() {
   if (!res.ok) {
     return { state: 'error', message: `GitHub sunucusuna ulaşılamadı (HTTP ${res.status})` };
   }
-  const data = await res.json();
+  const list = await res.json();
+  const validReleases = Array.isArray(list) ? list.filter((r) => !r.draft) : [];
+  if (!validReleases.length) {
+    return {
+      state: 'no-release',
+      currentVersion: currentVer,
+      repoUrl: GITHUB_URL,
+      message: 'Resmi GitHub deposunda henüz yeni bir Release yayınlanmadı (v' + currentVer + ' aktif).'
+    };
+  }
+
+  // En yüksek sürümü bul (pre-release / beta dahil)
+  const data = [...validReleases].sort((a, b) =>
+    compareSemver(String(b.tag_name || b.name || ''), String(a.tag_name || a.name || ''))
+  )[0];
+
   const latestVer = String(data.tag_name || data.name || '').replace(/^v/i, '');
-  const exeAsset = Array.isArray(data.assets)
-    ? data.assets.find((a) => /\.exe$/i.test(a.name))
-    : null;
+  const assets = Array.isArray(data.assets) ? data.assets : [];
+  const exeAsset = assets.find((a) => /\.exe$/i.test(a.name)) || null;
+  const ymlAsset = assets.find((a) => /^(beta|latest)\.yml$/i.test(a.name)) || null;
 
   if (compareSemver(latestVer, currentVer) > 0) {
     return {
       state: 'available',
       currentVersion: currentVer,
       version: latestVer,
+      prerelease: !!data.prerelease,
       releaseName: data.name || `v${latestVer}`,
       releaseNotes: cleanReleaseNotes(data.body) || 'Yeni sürüm yayınlandı.',
       releaseDate: data.published_at,
       htmlUrl: data.html_url,
       downloadUrl: exeAsset ? exeAsset.browser_download_url : data.html_url,
+      ymlUrl: ymlAsset ? ymlAsset.browser_download_url : null,
       canAutoInstall: app.isPackaged
     };
   }
@@ -1630,15 +1714,12 @@ ipcMain.handle('update:download', async (_e, fallbackUrl) => {
       await autoUpdater.downloadUpdate();
       return { ok: true, mode: 'updater' };
     } catch (err) {
-      // Eğer latest.yml içindeki dosya adı ile GitHub'daki .exe adı farklıysa doğrudan .exe'yi indir
+      // Eğer latest.yml içindeki dosya adı ile GitHub'daki .exe adı farklıysa veya pre-release ise doğrudan .exe'yi indir
       try {
-        let exeUrl = fallbackUrl;
-        if (!exeUrl || !/\.exe$/i.test(exeUrl)) {
-          const rel = await checkOfficialGithubRelease();
-          exeUrl = rel.downloadUrl;
-        }
+        const rel = await checkOfficialGithubRelease();
+        const exeUrl = fallbackUrl && /\.exe$/i.test(fallbackUrl) ? fallbackUrl : rel.downloadUrl;
         if (exeUrl && /\.exe$/i.test(exeUrl)) {
-          await downloadInstallerDirectly(exeUrl);
+          await downloadInstallerDirectly(exeUrl, rel.ymlUrl || null);
           return { ok: true, mode: 'direct-installer' };
         }
       } catch {}
@@ -1651,7 +1732,8 @@ ipcMain.handle('update:download', async (_e, fallbackUrl) => {
   } else {
     if (fallbackUrl && /\.exe$/i.test(fallbackUrl)) {
       try {
-        await downloadInstallerDirectly(fallbackUrl);
+        const rel = await checkOfficialGithubRelease().catch(() => ({}));
+        await downloadInstallerDirectly(fallbackUrl, rel.ymlUrl || null);
         return { ok: true, mode: 'direct-installer' };
       } catch {}
     }
@@ -2331,6 +2413,26 @@ ipcMain.handle('auth:removeAccount', (_e, accountId) => {
   return { ok: true };
 });
 
+function formatUuidWithDashes(hex32) {
+  const clean = String(hex32 || '').replace(/-/g, '').toLowerCase();
+  if (clean.length !== 32) return clean;
+  return clean.replace(/^([0-9a-f]{8})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{12})$/, '$1-$2-$3-$4-$5');
+}
+
+function generateOfflineUuidForModel(username, preferSlim) {
+  const buf = crypto.createHash('md5').update(`OfflinePlayer:${username}`).digest();
+  // Standart RFC 4122 v3 UUID bitleri
+  buf[6] = (buf[6] & 0x0f) | 0x30;
+  buf[8] = (buf[8] & 0x3f) | 0x80;
+  // Java UUID.hashCode() = int0 ^ int1 ^ int2 ^ int3; (hashCode & 1) === 1 -> Alex (slim), 0 -> Steve (classic)
+  const hash = buf.readInt32BE(0) ^ buf.readInt32BE(4) ^ buf.readInt32BE(8) ^ buf.readInt32BE(12);
+  const wantParity = preferSlim ? 1 : 0;
+  if ((hash & 1) !== wantParity) {
+    buf[15] ^= 1;
+  }
+  return formatUuidWithDashes(buf.toString('hex'));
+}
+
 async function getAuthorizationForLaunch(s) {
   if (s.authMode === 'microsoft') {
     const accounts = loadAccounts();
@@ -2359,7 +2461,30 @@ async function getAuthorizationForLaunch(s) {
       }
     };
   }
-  return Authenticator.getAuth(s.username);
+
+  // Çevrimdışı modda önce Mojang API'den gerçek UUID kontrol et (oyunda gerçek skin/Alex modelini gösterebilmek için)
+  let resolvedUuid = null;
+  try {
+    const info = await Promise.race([
+      lookupMojangSkinAndProfile(s.username),
+      new Promise((resolve) => setTimeout(() => resolve(null), 3000))
+    ]);
+    if (info && info.found && info.uuid && !s.offlineSkinModelOverride) {
+      resolvedUuid = formatUuidWithDashes(info.uuid);
+    }
+  } catch {}
+
+  if (!resolvedUuid) {
+    resolvedUuid = generateOfflineUuidForModel(s.username, s.offlineSkinModel === 'slim');
+  }
+
+  return {
+    access_token: resolvedUuid,
+    client_token: resolvedUuid,
+    uuid: resolvedUuid,
+    name: s.username,
+    user_properties: '{}'
+  };
 }
 
 // ---------------- Diğer Launcher'lardan Profil Göçü (Import Wizard) ----------------
@@ -2999,7 +3124,178 @@ ipcMain.handle('config:save', (_e, { instanceId, relPath, content }) => {
   }
 });
 
-// ---------------- Skin Stüdyosu (PNG İndirme & Microsoft Hesabına Yükleme) ----------------
+// ---------------- Skin Stüdyosu (Resmi Mojang Skin Çözücü, PNG İndirme & Microsoft Hesabına Yükleme) ----------------
+const skinLookupCache = new Map();
+
+function detectSlimFromSkinPng(pngBuffer) {
+  try {
+    const img = nativeImage.createFromBuffer(pngBuffer);
+    const { width, height } = img.getSize();
+    if (width >= 64 && height >= width) {
+      const bmp = img.toBitmap();
+      const px = Math.floor((54 / 64) * width);
+      const py = Math.floor((20 / 64) * height);
+      const idx = (py * width + px) * 4 + 3;
+      if (idx < bmp.length && bmp[idx] === 0) return 'slim';
+    }
+  } catch {}
+  return 'classic';
+}
+
+async function fetchImageAsPngBuffer(url) {
+  const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+  if (!res.ok) return null;
+  const ct = res.headers.get('content-type') || '';
+  if (ct && !ct.includes('image') && !ct.includes('octet-stream')) return null;
+  return Buffer.from(await res.arrayBuffer());
+}
+
+async function lookupMojangSkinAndProfile(username, { forceRefresh = false } = {}) {
+  const cleanName = String(username || '').trim();
+  if (!cleanName || !/^[A-Za-z0-9_]{1,16}$/.test(cleanName)) {
+    return { ok: true, found: false, name: cleanName || 'Steve', model: 'classic', skinDataUrl: null, capeDataUrl: null };
+  }
+
+  const cacheKey = cleanName.toLowerCase();
+  const cached = skinLookupCache.get(cacheKey);
+  if (!forceRefresh && cached && Date.now() - cached.ts < 5 * 60 * 1000) {
+    return cached.data;
+  }
+
+  let found = false;
+  let uuid = null;
+  let canonicalName = cleanName;
+  let model = 'classic';
+  let skinDataUrl = null;
+  let capeDataUrl = null;
+
+  try {
+    const profRes = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(cleanName)}`, {
+      headers: { 'User-Agent': USER_AGENT },
+      signal: AbortSignal.timeout(5000)
+    });
+    if (profRes.ok) {
+      const prof = await profRes.json();
+      if (prof && prof.id) {
+        found = true;
+        uuid = prof.id;
+        canonicalName = prof.name || cleanName;
+        const sessRes = await fetch(`https://sessionserver.mojang.com/session/minecraft/profile/${uuid}`, {
+          headers: { 'User-Agent': USER_AGENT },
+          signal: AbortSignal.timeout(5000)
+        });
+        if (sessRes.ok) {
+          const sess = await sessRes.json();
+          const texProp = Array.isArray(sess.properties) ? sess.properties.find((p) => p.name === 'textures') : null;
+          if (texProp && texProp.value) {
+            const decoded = JSON.parse(Buffer.from(texProp.value, 'base64').toString('utf8'));
+            const skinTex = decoded?.textures?.SKIN;
+            if (skinTex && skinTex.url) {
+              model = skinTex.metadata?.model === 'slim' ? 'slim' : 'classic';
+              const pngBuf = await fetchImageAsPngBuffer(skinTex.url);
+              if (pngBuf) {
+                skinDataUrl = `data:image/png;base64,${pngBuf.toString('base64')}`;
+                if (!skinTex.metadata?.model) {
+                  model = detectSlimFromSkinPng(pngBuf);
+                }
+              }
+            }
+            const capeTex = decoded?.textures?.CAPE;
+            if (capeTex && capeTex.url) {
+              const capeBuf = await fetchImageAsPngBuffer(capeTex.url);
+              if (capeBuf) capeDataUrl = `data:image/png;base64,${capeBuf.toString('base64')}`;
+            }
+          }
+        }
+      }
+    }
+  } catch {}
+
+  // Yedek kaynak (Mojang API erişilemezse veya isim Mojang'da kayıtlı değilse)
+  if (!skinDataUrl) {
+    for (const fallbackUrl of [
+      `https://mc-heads.net/skin/${encodeURIComponent(cleanName)}`,
+      `https://minotar.net/skin/${encodeURIComponent(cleanName)}`
+    ]) {
+      try {
+        const pngBuf = await fetchImageAsPngBuffer(fallbackUrl);
+        if (pngBuf && pngBuf.length > 100) {
+          skinDataUrl = `data:image/png;base64,${pngBuf.toString('base64')}`;
+          model = detectSlimFromSkinPng(pngBuf);
+          break;
+        }
+      } catch {}
+    }
+  }
+
+  const data = {
+    ok: true,
+    found,
+    uuid,
+    name: canonicalName,
+    model,
+    skinDataUrl,
+    capeDataUrl
+  };
+  if (found && skinDataUrl) {
+    skinLookupCache.set(cacheKey, { ts: Date.now(), data });
+  }
+  return data;
+}
+
+ipcMain.handle('skin:lookup', async (_e, { username, forceRefresh = false } = {}) => {
+  try {
+    return await lookupMojangSkinAndProfile(username, { forceRefresh });
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+ipcMain.handle('skin:pickLocalPng', async (_e, { model } = {}) => {
+  try {
+    const r = await dialog.showOpenDialog(win, {
+      title: 'Özel Yerel Skin (.png) Dosyasını Seç',
+      filters: [{ name: 'Minecraft Skin (PNG)', extensions: ['png'] }],
+      properties: ['openFile']
+    });
+    if (r.canceled || !r.filePaths[0]) return { ok: false, canceled: true };
+
+    const buf = fs.readFileSync(r.filePaths[0]);
+    const img = nativeImage.createFromBuffer(buf);
+    const { width, height } = img.getSize();
+    if (width < 64 || height < 32) {
+      return { ok: false, error: 'Geçersiz skin dosyası (en az 64x32 piksel PNG olmalıdır).' };
+    }
+
+    const detectedModel = model === 'slim' || model === 'classic' ? model : detectSlimFromSkinPng(buf);
+    const dest = path.join(app.getPath('userData'), 'custom-skin.png');
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, buf);
+
+    const skinDataUrl = `data:image/png;base64,${buf.toString('base64')}`;
+    const s = loadSettings();
+    saveSettings({
+      ...s,
+      customSkinDataUrl: skinDataUrl,
+      offlineSkinModel: detectedModel
+    });
+
+    return { ok: true, skinDataUrl, model: detectedModel };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+ipcMain.handle('skin:clearLocalPng', () => {
+  const s = loadSettings();
+  saveSettings({ ...s, customSkinDataUrl: '' });
+  const customFile = path.join(app.getPath('userData'), 'custom-skin.png');
+  try {
+    if (fs.existsSync(customFile)) fs.unlinkSync(customFile);
+  } catch {}
+  return { ok: true };
+});
+
 ipcMain.handle('skin:downloadPng', async (_e, { username } = {}) => {
   const cleanName = String(username || 'Steve').trim() || 'Steve';
   const saveRes = await dialog.showSaveDialog(win, {
@@ -3010,6 +3306,12 @@ ipcMain.handle('skin:downloadPng', async (_e, { username } = {}) => {
   if (saveRes.canceled || !saveRes.filePath) return { ok: false, canceled: true };
 
   try {
+    const lookedUp = await lookupMojangSkinAndProfile(cleanName, { forceRefresh: true });
+    if (lookedUp && lookedUp.skinDataUrl && lookedUp.skinDataUrl.includes(',')) {
+      const b64 = lookedUp.skinDataUrl.split(',')[1];
+      fs.writeFileSync(saveRes.filePath, Buffer.from(b64, 'base64'));
+      return { ok: true, filePath: saveRes.filePath };
+    }
     const res = await fetch(`https://mc-heads.net/download/${encodeURIComponent(cleanName)}`, {
       headers: { 'User-Agent': USER_AGENT }
     });
@@ -3065,6 +3367,7 @@ ipcMain.handle('skin:uploadMicrosoft', async (_e, { variant } = {}) => {
       const errText = await uploadRes.text().catch(() => '');
       throw new Error(`Skin yüklenemedi (HTTP ${uploadRes.status})${errText ? ': ' + errText.slice(0, 120) : ''}`);
     }
+    skinLookupCache.delete(acc.name.toLowerCase());
     return { ok: true, accountName: acc.name };
   } catch (err) {
     return { ok: false, error: err.message || String(err) };

@@ -10,7 +10,7 @@
 
 ---
 
-## ✨ Neler Var? (v1.2.0)
+## ✨ Neler Var? (v1.2.1-beta)
 
 - **🗂️ İzole Profil (Instance) Yönetimi:** Ana oyun klasörünü bozmadan **Fabric**, **NeoForge**, **OptiFine**, **Forge**, **Quilt** ve **Vanilla** profillerini birbirinden bağımsız `mods`, `saves`, `shaderpacks` ve `config` klasörlerinde tut.
 - **🟢 Modrinth İçerik Mağazası & `.mrpack` Desteği:** Tarayıcıya ihtiyaç duymadan doğrudan launcher içinden **Mod**, **Modpack (`.mrpack`)**, **Shader** ve **Kaynak Paketi (Resource Pack)** ara, gerekli kütüphane bağımlılıklarıyla (*Fabric API* vb.) birlikte tek tıkla kur.
@@ -43,7 +43,7 @@ npm.cmd start
 npm.cmd run dist
 ```
 
-Kurulum dosyası (`Lumora-Launcher-Setup-1.2.0.exe` ve `latest.yml`) `dist/` klasörüne oluşturulur.
+Kurulum dosyası (`Lumora-Launcher-Setup-1.2.1-beta.exe` ve `latest.yml`) `dist/` klasörüne oluşturulur.
 
 ## ⚖️ Yasal Uyarı & Bağımsızlık Beyanı (Disclaimer)
 

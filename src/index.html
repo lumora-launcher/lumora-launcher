@@ -48,7 +48,7 @@
         <svg viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 2.3 6.7 3.7L12 11.7 5.3 8 12 4.3ZM5 9.7l6 3.3v6.7l-6-3.3V9.7Zm8 10V13l6-3.3v6.7l-6 3.3Z"/></svg>
       </div>
       <span class="brand-name">Lumora</span>
-      <span class="version-pill" id="appVersionBadge" title="Güncellemeleri kontrol et">v1.2.0</span>
+      <span class="version-pill" id="appVersionBadge" title="Güncellemeleri kontrol et">v1.2.1-beta</span>
     </div>
 
     <div class="titlebar-quick">
@@ -137,7 +137,7 @@
             <p class="sub">İzole profilini seç, Modrinth'ten modlarını ekle ve tek tıkla oyuna gir.</p>
           </div>
           <div class="avatar-wrap" id="avatarCard" title="Skin Stüdyosunu Aç — Tıkla" role="button" tabindex="0">
-            <img id="avatar" src="https://mc-heads.net/avatar/Steve/128" alt="avatar" />
+            <img id="avatar" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="avatar" />
             <div class="avatar-ring"></div>
             <span class="avatar-tag" id="avatarTag">Steve</span>
             <span class="account-mode-pill" id="accountModeBadge">ÇEVRİMDIŞI</span>
@@ -306,6 +306,15 @@
               <small class="hint" id="detailInstPath"></small>
             </div>
             <div class="inst-detail-actions">
+              <select id="instRamSelect" class="inst-ram-select" title="Bu profile özel RAM miktarı">
+                <option value="0">RAM: Genel Ayar</option>
+                <option value="2048">RAM: 2 GB</option>
+                <option value="4096">RAM: 4 GB</option>
+                <option value="6144">RAM: 6 GB</option>
+                <option value="8192">RAM: 8 GB</option>
+                <option value="12288">RAM: 12 GB</option>
+              </select>
+              <button class="ghost-btn" id="btnDuplicateInstance" title="Bu profili tüm modları ve ayarlarıyla kopyala">📋 Profili Çoğalt</button>
               <button class="ghost-btn hidden" id="btnPrepareBaseVersion" title="Bu profilin ihtiyaç duyduğu ana Minecraft sürümünü şimdi indir">⬇ Ana Sürümü Şimdi İndir</button>
               <button class="ghost-btn accent-border" id="btnInstallFpsPack" title="Sodium, Lithium, FerriteCore, EntityCulling kur">⚡ Tek Tıkla FPS Paketi Kur</button>
               <button class="ghost-btn" id="btnCheckModUpdates" title="Kurulu modları Modrinth üzerinden güncelle">🔄 Mod Güncellemelerini Denetle</button>
@@ -674,7 +683,7 @@
                 <div>
                   <div class="update-ver-line">
                     <h3>Lumora Launcher</h3>
-                    <span class="badge" id="currentVerText">v1.2.0</span>
+                    <span class="badge" id="currentVerText">v1.2.1-beta</span>
                     <span class="verified-pill">✓ Resmi Sürüm</span>
                   </div>
                   <p class="sub-sm" id="updateStatusTitle">Güncellemeler resmi GitHub sunucusu üzerinden otomatik denetlenir.</p>
@@ -794,33 +803,57 @@
       <div class="modal-head skin-modal-head">
         <div>
           <span class="badge">👕 Skin & Karakter Stüdyosu</span>
-          <h3>Tam Boy 3B Görünüm & Skin Yönetimi</h3>
+          <h3>Dahili 3B Görünüm & Alex/Steve Skin Yönetimi</h3>
         </div>
         <button class="icon-btn" id="btnSkinStudioClose" title="Kapat">✕</button>
       </div>
       <div class="skin-studio-grid">
         <div class="skin-preview-col">
           <div class="skin-stage">
-            <img id="skinFullBody" src="https://mc-heads.net/body/Steve/180" alt="Tam Boy Skin" />
+            <span class="skin-model-badge" id="skinDetectedModelBadge">Model: Steve (Klasik)</span>
+            <canvas id="skinFullBodyCanvas" width="220" height="250"></canvas>
+            <div class="skin-stage-tools">
+              <button type="button" class="ghost-btn" id="btnSkinFlipView" title="Ön / Arka Görünüm">🔄 Döndür</button>
+              <button type="button" class="ghost-btn" id="btnSkinToggleWalk" title="Yürüme Pozunu Aç / Kapat">🏃 Yürüme</button>
+            </div>
           </div>
           <div class="skin-bust-row">
-            <img id="skinBustImg" src="https://mc-heads.net/avatar/Steve/64" alt="Kafa" />
+            <img id="skinBustImg" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Kafa" />
             <div>
               <strong id="skinStudioPreviewLabel">Steve</strong>
-              <small class="hint">mc-heads.net canlı önizleme</small>
+              <small class="hint" id="skinMetaSubLabel">Mojang API & dahili 3B motor</small>
             </div>
           </div>
         </div>
         <div class="skin-controls-col">
           <div class="field">
-            <label for="skinSearchInput">Oyuncu Adı Ara / Önizle</label>
+            <label for="skinSearchInput">Oyuncu Adı Ara / Önizle (Steve & Alex uyumlu)</label>
             <div class="inline">
-              <input id="skinSearchInput" maxlength="16" placeholder="Örn: Notch, Dream, Steve..." spellcheck="false" autocomplete="off" />
+              <input id="skinSearchInput" maxlength="16" placeholder="Örn: Notch, Alex, Dream..." spellcheck="false" autocomplete="off" />
               <button type="button" class="ghost-btn accent-border" id="btnSkinPreview">Önizle</button>
             </div>
           </div>
-          <button type="button" class="ghost-btn accent-border full" id="btnSkinUseName">✓ Bu İsmi Kullan</button>
-          <button type="button" class="ghost-btn full" id="btnSkinDownloadPng">⬇ Skin (.png) İndir</button>
+          <div class="skin-btn-pair">
+            <button type="button" class="ghost-btn accent-border" id="btnSkinUseName">✓ Bu İsmi Kullan</button>
+            <button type="button" class="ghost-btn" id="btnSkinDownloadPng">⬇ Skin (.png) İndir</button>
+          </div>
+
+          <div class="skin-divider"></div>
+
+          <div class="field">
+            <label for="offlineSkinModelSelect">Çevrimdışı Mod Modeli & Yerel Skin (.png)</label>
+            <div class="select-wrap" style="margin-bottom:8px">
+              <select id="offlineSkinModelSelect">
+                <option value="classic">Steve (Klasik 4px Kollar)</option>
+                <option value="slim">Alex (İnce 3px Kollar)</option>
+              </select>
+            </div>
+            <div class="skin-btn-pair" style="margin-bottom:6px">
+              <button type="button" class="ghost-btn accent-border" id="btnPickLocalSkin">📂 Özel Skin (.png) Seç</button>
+              <button type="button" class="ghost-btn hidden" id="btnClearLocalSkin">✕ Temizle</button>
+            </div>
+            <button type="button" class="ghost-btn full" id="btnInstallSkinMod" title="Modlu profilde yerel/özel skinlerin oyun içinde görünmesi için CustomSkinLoader kur">🧩 Aktif Profile Skin Modu (CustomSkinLoader) Kur</button>
+          </div>
 
           <div class="skin-divider"></div>
 
@@ -835,7 +868,6 @@
             <button type="button" class="play-btn sm-btn full" id="btnSkinUploadMs">
               <span class="play-label">📤 Microsoft Hesabıma Skin (.png) Yükle</span>
             </button>
-            <small class="hint">64×64 PNG formatındaki kendi skin dosyanı seçip doğrudan Microsoft profiline yükleyebilirsin.</small>
           </div>
         </div>
       </div>

@@ -46,6 +46,7 @@ contextBridge.exposeInMainWorld('api', {
   listInstances: () => ipcRenderer.invoke('instances:list'),
   createInstance: (data) => ipcRenderer.invoke('instances:create', data),
   updateInstance: (data) => ipcRenderer.invoke('instances:update', data),
+  duplicateInstance: (id) => ipcRenderer.invoke('instances:duplicate', id),
   deleteInstance: (id) => ipcRenderer.invoke('instances:delete', id),
   openInstanceFolder: (id, sub) => ipcRenderer.invoke('instances:openFolder', id, sub),
 
@@ -71,7 +72,10 @@ contextBridge.exposeInMainWorld('api', {
   readConfigFile: (opts) => ipcRenderer.invoke('config:read', opts),
   saveConfigFile: (opts) => ipcRenderer.invoke('config:save', opts),
 
-  // Skin Stüdyosu (.png İndirme & Microsoft Hesabına Yükleme)
+  // Skin Stüdyosu (Mojang Skin/Model Çözücü, Yerel PNG, İndirme & Microsoft Yükleme)
+  lookupSkin: (opts) => ipcRenderer.invoke('skin:lookup', opts),
+  pickLocalSkinPng: (opts) => ipcRenderer.invoke('skin:pickLocalPng', opts),
+  clearLocalSkinPng: () => ipcRenderer.invoke('skin:clearLocalPng'),
   downloadSkinPng: (opts) => ipcRenderer.invoke('skin:downloadPng', opts),
   uploadMicrosoftSkin: (opts) => ipcRenderer.invoke('skin:uploadMicrosoft', opts),
 
