@@ -144,6 +144,20 @@ npm.cmd run dist:beta     # Beta build (Lumora-Launcher-Beta-Setup-x.x.x-beta.ex
 - **🌍 7 Dil Desteği:** Üst başlıktan anında **🇹🇷 Türkçe**, **🇬🇧 English**, **🇩🇪 Deutsch**, **🇪🇸 Español**, **🇷🇺 Русский**, **🇫🇷 Français**, **🇧🇷 Português** arası geçiş yap.
 - **🧪 Normal & Beta Ayrı Kurulumlar:** Beta sürümleri altın-kehribar simgesi, `BETA` arayüz rozetleri ve ayrı Windows kurulum kimliğiyle (`com.lumora.launcher.beta`) normal sürümün üzerine yazmadan kurulur.
 
+### 🛠️ Geliştirici Kurulumu (Normal & Beta)
+
+```powershell
+# Bağımlılıkları yükle
+npm.cmd install
+
+# Geliştirici modunda başlat
+npm.cmd start
+
+# Windows kurulum paketi (.exe) oluştur
+npm.cmd run dist:stable   # Normal sürüm (Lumora-Launcher-Setup-x.x.x.exe)
+npm.cmd run dist:beta     # Beta sürüm (Lumora-Launcher-Beta-Setup-x.x.x-beta.exe)
+```
+
 ---
 
 ## ⚖️ Disclaimer / Yasal Uyarı
